@@ -22,17 +22,40 @@ const CycleCount = () => {
     currentTask,
     currentTaskLocation,
     isLoading,
-    assetsWithStatus,
     scannedItems,
-    filteredTempAssets,
-    filteredScannedItems,
+    scannedAssets,
+    filteredScannedAssets,
     hasStarted,
     handleScanSuccess,
     handleManualEntry,
     handleCreateTempAsset,
     handleAssetToggle,
     handleCompleteTask,
+    useAssetCount,
+    tempAssets,
   } = useCycleCountLogic(taskId);
+
+  const locationId = currentTask?.location_filter || undefined;
+  const category = currentTask && 'category_filter' in currentTask ? currentTask.category_filter : undefined;
+  const { data: totalAssetCount = 0 } = useAssetCount(locationId, category);
+
+  // Join asset details to each scanned item
+  const scannedItemsWithAssets = scannedItems.map(item => ({
+    ...item,
+    asset: scannedAssets.find(asset => asset.id === item.asset_id),
+  }));
+
+  // Optionally, filter by search term on asset name/barcode
+  const filteredScannedItemsWithAssets = scannedItemsWithAssets.filter(item => {
+    const name = item.asset?.name?.toLowerCase() || '';
+    const barcode = item.asset?.barcode || '';
+    return name.includes(searchTerm.toLowerCase()) || barcode.includes(searchTerm);
+  });
+
+  // Filter temp assets for this task
+  const filteredTempAssets = tempAssets.filter(
+    asset => asset.cycle_count_task_id === currentTask.id
+  );
 
   if (isLoading || !currentTask) {
     return (
@@ -57,24 +80,23 @@ const CycleCount = () => {
   }
 
   if (showCompletionSummary) {
-    // Convert scanned items to assets format for summary
-    const countedAssets = scannedItems.map(item => ({
-      id: item.asset?.id || item.id,
-      name: item.asset?.name || 'Unknown Asset',
-      barcode: item.asset?.barcode || null,
-      location: item.expected_location,
-      actualLocation: item.actual_location,
-      category: item.asset?.category || null,
+    // Convert scanned assets to summary format
+    const countedAssets = (scannedAssets || []).map(asset => ({
+      id: asset.id,
+      name: asset.name || 'Unknown Asset',
+      barcode: asset.barcode || null,
+      location: asset.location || null,
+      category: asset.category || null,
       status: 'counted' as const,
-      hasLocationMismatch: item.expected_location !== item.actual_location
+      last_seen: asset.last_seen || null,
+      // Add any other required Asset fields with defaults
     }));
-
     return (
       <CycleCountSummary
         taskName={currentTask.name}
         countedAssets={countedAssets}
         missingAssets={[]}
-        tempAssets={filteredTempAssets}
+        tempAssets={[]}
       />
     );
   }
@@ -92,7 +114,7 @@ const CycleCount = () => {
             onComplete={handleCompleteTask}
           />
 
-          <ProgressStats scannedItems={scannedItems} totalExpectedAssets={assetsWithStatus.length} />
+          <ProgressStats scannedItems={scannedItemsWithAssets} totalExpectedAssets={totalAssetCount} />
 
           <CycleCountActions
             manualBarcode={manualBarcode}
@@ -101,12 +123,13 @@ const CycleCount = () => {
             onScanBarcode={() => setShowScanner(true)}
             onCreateTempAsset={handleCreateTempAsset}
             currentTaskLocation={currentTaskLocation}
+            // Remove tempAssets and scannedItems if not expected by props
           />
 
           <CycleCountTabs
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
-            scannedItems={filteredScannedItems}
+            scannedItems={filteredScannedItemsWithAssets}
             tempAssets={filteredTempAssets}
           />
         </div>

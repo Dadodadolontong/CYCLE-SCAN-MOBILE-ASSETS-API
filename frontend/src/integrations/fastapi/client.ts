@@ -1,5 +1,5 @@
 // FastAPI client configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8002';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8002';
 
 export interface LoginRequest {
   username: string; // FastAPI OAuth2 expects 'username' field
@@ -68,6 +68,13 @@ class FastAPIClient {
     try {
       const response = await fetch(url, config);
       
+      if (response.status === 401) {
+        // Force logout on unauthorized
+        this.clearToken();
+        window.location.href = '/auth';
+        throw new Error('Session expired. Please log in again.');
+      }
+
       if (!response.ok) {
         const errorData: ApiError = await response.json().catch(() => ({ detail: 'Unknown error' }));
         throw new Error(errorData.detail || `HTTP ${response.status}`);

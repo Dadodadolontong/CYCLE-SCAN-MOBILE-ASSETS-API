@@ -86,7 +86,7 @@ class Location(Base):
 
 class Asset(Base):
     __tablename__ = 'assets'
-    id = Column(String(36), primary_key=True)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), server_default=text('uuid()'))
     erp_asset_id = Column(String(64), unique=True, nullable=False)
     name = Column(String(255), nullable=False)
     barcode = Column(String(64), index=True)
@@ -117,7 +117,7 @@ class Profile(Base):
 
 class TempAsset(Base):
     __tablename__ = 'temp_assets'
-    id = Column(String(36), primary_key=True)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), server_default=text("gen_random_uuid()"))
     description = Column(String(255), nullable=False)
     model = Column(String(128))
     build = Column(String(128))
@@ -133,7 +133,7 @@ class TempAsset(Base):
 
 class CycleCountTask(Base):
     __tablename__ = 'cycle_count_tasks'
-    id = Column(String(36), primary_key=True)
+    id = Column(String(36), primary_key=True, server_default=text("gen_random_uuid()"))
     name = Column(String(255), nullable=False)
     description = Column(String(255))
     location_filter = Column(String(255))
@@ -148,7 +148,7 @@ class CycleCountTask(Base):
 
 class CycleCountItem(Base):
     __tablename__ = 'cycle_count_items'
-    id = Column(String(36), primary_key=True)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     task_id = Column(String(36), ForeignKey('cycle_count_tasks.id'), nullable=False)
     asset_id = Column(String(36), ForeignKey('assets.id'), nullable=False)
     expected_location = Column(String(255))

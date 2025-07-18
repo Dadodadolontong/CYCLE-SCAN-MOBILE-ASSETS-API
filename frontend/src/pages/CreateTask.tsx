@@ -109,10 +109,6 @@ const CreateTask = () => {
     );
   }
 
-  if (!branches.length) {
-    console.log('Branches not loaded yet, skipping assignment logic');
-  }
-
   const getEstimatedAssetCount = () => {
     let filteredAssets = assets;
     
@@ -314,9 +310,9 @@ const CreateTask = () => {
                   <SelectValue placeholder="Select a user to assign this task to" />
                 </SelectTrigger>
                 <SelectContent>
-                  {assignableUsers.map((user) => (
+                    {assignableUsers.map((user) => (
                     <SelectItem key={user.id} value={user.id}>
-                      {user.display_name || user.email || 'Unnamed User'}
+                      {user.display_name || profiles.find(p => p.id === user.id)?.email || 'Unnamed User'} - {user.role}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -359,8 +355,8 @@ const CreateTask = () => {
                 <div className="text-sm text-muted-foreground space-y-1">
                   <div><strong>Name:</strong> {formData.name}</div>
                   {formData.description && <div><strong>Description:</strong> {formData.description}</div>}
-                  <div><strong>Location Filter:</strong> {formData.locationFilter || 'None selected'}</div>
-                  <div><strong>Assigned To:</strong> {selectedUser?.display_name || 'Unassigned'}</div>
+                  <div><strong>Location Filter:</strong> {formData.locationFilter || 'None selected'}</div>              
+                  <div><strong>Assigned to:</strong> {selectedUser?.display_name || selectedUser?.email || profiles.find(p => p.id === selectedUser?.id)?.email || 'Unassigned'}</div>
                   <div><strong>Estimated Assets:</strong> {estimatedAssets}</div>
                   <div><strong>Status:</strong> Draft (can be activated later)</div>
                 </div>

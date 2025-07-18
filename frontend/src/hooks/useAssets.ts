@@ -22,8 +22,7 @@ export const useAssets = () => {
       
       // Transform database assets to include cycle count status
       return data.map(asset => ({
-        ...asset,
-        status: 'pending' as const, // Default status for cycle counting
+        ...asset
       })) as Asset[];
     },
   });
