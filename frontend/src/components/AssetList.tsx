@@ -63,11 +63,11 @@ const AssetList = ({ assets, onAssetToggle }: AssetListProps) => {
                   {asset.hasLocationMismatch ? (
                     <>
                       <span className="text-sm text-muted-foreground">
-                        Expected: {asset.location || 'No location'}
+                        Found: {asset.location || 'No location'}
                       </span>
                       <span className="text-sm text-muted-foreground">•</span>
                       <span className="text-sm text-warning">
-                        Found: {asset.actualLocation || 'No location'}
+                        Expected: {asset.expectedLocation || 'No location'}
                       </span>
                     </>
                   ) : (

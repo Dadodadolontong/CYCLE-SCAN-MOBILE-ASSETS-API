@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { fastapiClient, UserResponse, LoginRequest, RegisterRequest } from '@/integrations/fastapi/client';
+import { useLocation } from 'react-router-dom';
 
 interface AuthContextType {
   user: UserResponse | null;
@@ -7,6 +8,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   signInWithPassword: (email: string, password: string) => Promise<{ error?: any }>;
   signUpWithPassword: (email: string, password: string) => Promise<{ error?: any }>;
+  setUser: (user: UserResponse | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,6 +24,18 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const location = useLocation();
+
+  useEffect(() => {
+    // Check for token in URL
+    const params = new URLSearchParams(location.search);
+    const token = params.get('token');
+    if (token) {
+      fastapiClient.setToken(token);
+      fastapiClient.getCurrentUser().then(setUser);
+      window.history.replaceState({}, document.title, location.pathname);
+    }
+  }, [location]);
 
   useEffect(() => {
     // Check for existing authentication on app load
@@ -93,6 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signOut,
     signInWithPassword,
     signUpWithPassword,
+    setUser,
   };
 
   return (

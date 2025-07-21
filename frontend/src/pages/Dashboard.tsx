@@ -1,27 +1,46 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CalendarDays, MapPin, Package, Users, Activity, CheckCircle, Clock, AlertTriangle, Barcode, Database } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/FastAPIAuthContext";
+import { fastapiClient } from "@/integrations/fastapi/client";
 import { UserMenu } from "@/components/UserMenu";
 import { useCycleCountTasks } from "@/hooks/useCycleCountTasks";
 import { useAssets, useAssetCount } from "@/hooks/useAssets";
 import { useLocations } from "@/hooks/useLocations";
 import { useCategories } from "@/hooks/useCategories";
 import { useUserRole } from "@/hooks/useUserRole";
+import Pagination from "@/components/Pagination";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const location = useLocation();
+  const { user, setUser } = useAuth();
   const { data: userRole } = useUserRole();
-  const { data: tasks = [], isLoading: tasksLoading } = useCycleCountTasks(userRole, user?.id);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
+  const { data: tasksData = { items: [], total: 0 }, isLoading: tasksLoading } = useCycleCountTasks(userRole, user?.id, page, pageSize, statusFilter);
+  const tasks = tasksData.items;
+  const totalTasks = tasksData.total;
   const { data: assets = [], isLoading: assetsLoading } = useAssets();
   const { data: locations = [] } = useLocations();
   const { data: categories = [] } = useCategories();
   const { data: assetCount, isLoading: assetCountLoading } = useAssetCount();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const token = params.get("token");
+    if (token) {
+      fastapiClient.setToken(token);
+      fastapiClient.getCurrentUser().then(setUser);
+      window.history.replaceState({}, document.title, location.pathname);
+    }
+  }, [location, setUser]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -167,149 +186,55 @@ const Dashboard = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-        <Tabs defaultValue="active" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="active">Active</TabsTrigger>
-            <TabsTrigger value="pending">Pending</TabsTrigger>
-            <TabsTrigger value="completed">Completed</TabsTrigger>
-            <TabsTrigger value="draft">Draft</TabsTrigger>
-            <TabsTrigger value="all">All Tasks</TabsTrigger>
-          </TabsList>
-
-              <TabsContent value="active" className="space-y-4">
-                {tasks.filter(task => task.status === 'active').map((task) => (
-                  <div key={task.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="space-y-1">
-                      <h4 className="font-medium">{task.name}</h4>
-                      <p className="text-sm text-muted-foreground">{task.description}</p>
-                      <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        <span>Started {task.started_at ? new Date(task.started_at).toLocaleDateString() : 'Not started'}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      {getStatusBadge(task.status)}
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => navigate(`/cycle-count/${task.id}`)}
-                      >
-                        Resume Task
-                      </Button>
+            <div className="mb-4 flex items-center gap-4">
+              <label htmlFor="status-filter" className="text-sm font-medium">Task Status:</label>
+              <Select value={statusFilter} onValueChange={value => { setStatusFilter(value); setPage(1); }}>
+                <SelectTrigger className="w-40" id="status-filter">
+                  <SelectValue>{statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-4">
+              {tasks.map((task) => (
+                <div key={task.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="space-y-1">
+                    <h4 className="font-medium">{task.name}</h4>
+                    <p className="text-sm text-muted-foreground">{task.description}</p>
+                    <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      <span>Started {task.started_at ? new Date(task.started_at).toLocaleDateString() : 'Not started'}</span>
                     </div>
                   </div>
-                ))}
-                {tasks.filter(task => task.status === 'active').length === 0 && (
-                  <p className="text-center text-muted-foreground py-8">No active tasks</p>
-                )}
-              </TabsContent>
-
-              <TabsContent value="pending" className="space-y-4">
-                {tasks.filter(task => task.status === 'draft' || (task.status === 'active' && !task.started_at)).map((task) => (
-                  <div key={task.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="space-y-1">
-                      <h4 className="font-medium">{task.name}</h4>
-                      <p className="text-sm text-muted-foreground">{task.description}</p>
-                      <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        <span>Ready to start - Created {new Date(task.created_at).toLocaleDateString()}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      {getStatusBadge(task.status)}
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => navigate(`/cycle-count/${task.id}`)}
-                      >
-                        Start Task
-                      </Button>
-                    </div>
+                  <div className="flex items-center space-x-2">
+                    {getStatusBadge(task.status)}
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => navigate(`/cycle-count/${task.id}`)}
+                    >
+                      {task.status === 'active' ? 'Resume Task' : 'View Task'}
+                    </Button>
                   </div>
-                ))}
-                {tasks.filter(task => task.status === 'draft' || (task.status === 'active' && !task.started_at)).length === 0 && (
-                  <p className="text-center text-muted-foreground py-8">No pending tasks</p>
-                )}
-              </TabsContent>
-
-              <TabsContent value="completed" className="space-y-4">
-                {tasks.filter(task => task.status === 'completed').map((task) => (
-                  <div key={task.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="space-y-1">
-                      <h4 className="font-medium">{task.name}</h4>
-                      <p className="text-sm text-muted-foreground">{task.description}</p>
-                      <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                        <CheckCircle className="h-3 w-3" />
-                        <span>Completed {task.completed_at ? new Date(task.completed_at).toLocaleDateString() : 'Recently'}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      {getStatusBadge(task.status)}
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => navigate(`/task-review/${task.id}`)}
-                      >
-                        Review Task
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-                {tasks.filter(task => task.status === 'completed').length === 0 && (
-                  <p className="text-center text-muted-foreground py-8">No completed tasks</p>
-                )}
-              </TabsContent>
-
-              <TabsContent value="draft" className="space-y-4">
-                {tasks.filter(task => task.status === 'draft').map((task) => (
-                  <div key={task.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="space-y-1">
-                      <h4 className="font-medium">{task.name}</h4>
-                      <p className="text-sm text-muted-foreground">{task.description}</p>
-                      <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                        <AlertTriangle className="h-3 w-3" />
-                        <span>Created {new Date(task.created_at).toLocaleDateString()}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      {getStatusBadge(task.status)}
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => navigate(`/edit-task/${task.id}`)}
-                      >
-                        Review/Edit
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-                {tasks.filter(task => task.status === 'draft').length === 0 && (
-                  <p className="text-center text-muted-foreground py-8">No draft tasks</p>
-                )}
-              </TabsContent>
-
-              <TabsContent value="all" className="space-y-4">
-                {tasks.slice(0, 5).map((task) => (
-                  <div key={task.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="space-y-1">
-                      <h4 className="font-medium">{task.name}</h4>
-                      <p className="text-sm text-muted-foreground">{task.description}</p>
-                      <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                        <CalendarDays className="h-3 w-3" />
-                        <span>Created {new Date(task.created_at).toLocaleDateString()}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      {getStatusBadge(task.status)}
-                      <Button variant="outline" size="sm">View</Button>
-                    </div>
-                  </div>
-                ))}
-                {tasks.length === 0 && (
-                  <p className="text-center text-muted-foreground py-8">No tasks created yet</p>
-                )}
-              </TabsContent>
-            </Tabs>
+                </div>
+              ))}
+              <Pagination
+                currentPage={page}
+                totalItems={totalTasks}
+                pageSize={pageSize}
+                onPageChange={setPage}
+              />
+              {tasks.length === 0 && (
+                <p className="text-center text-muted-foreground py-8">No tasks found for this status</p>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>

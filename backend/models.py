@@ -159,6 +159,7 @@ class CycleCountItem(Base):
     notes = Column(String(255))
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     __table_args__ = (UniqueConstraint('task_id', 'asset_id', name='uq_task_asset'),)
+    asset = relationship('Asset', backref='cycle_count_items')
 
 # Placeholder for users (since Supabase handled auth.users)
 class User(Base):

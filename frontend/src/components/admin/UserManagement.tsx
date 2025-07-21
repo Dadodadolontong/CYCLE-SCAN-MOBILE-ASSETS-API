@@ -57,7 +57,7 @@ export const UserManagement = () => {
 
   const updateRoleMutation = useMutation({
     mutationFn: async ({ userId, newRole }: { userId: string; newRole: string }) => {
-      await fastapiClient.put(`/admin/users/${userId}/role`, { new_role: newRole });
+      await fastapiClient.put(`/admin/users/${userId}/role?new_role=${encodeURIComponent(newRole)}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });

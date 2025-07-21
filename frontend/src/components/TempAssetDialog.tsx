@@ -16,6 +16,7 @@ const TempAssetDialog = ({ open, onOpenChange, onCreateAsset, currentTaskLocatio
     description: '',
     model: '',
     build: '',
+    barcode: '',
   });
 
   const handleCreate = () => {
@@ -27,9 +28,10 @@ const TempAssetDialog = ({ open, onOpenChange, onCreateAsset, currentTaskLocatio
       description: tempAssetForm.description,
       model: tempAssetForm.model || undefined,
       build: tempAssetForm.build || undefined,
+      barcode: tempAssetForm.barcode || undefined,
     });
 
-    setTempAssetForm({ description: '', model: '', build: '' });
+    setTempAssetForm({ description: '', model: '', build: '', barcode:'' });
   };
 
   return (
@@ -72,6 +74,15 @@ const TempAssetDialog = ({ open, onOpenChange, onCreateAsset, currentTaskLocatio
               value={currentTaskLocation}
               disabled
               className="bg-muted"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="build">Build</Label>
+            <Input
+              id="barcode"
+              placeholder="Barcode..."
+              value={tempAssetForm.barcode}
+              onChange={(e) => setTempAssetForm(prev => ({ ...prev, barcode: e.target.value }))}
             />
           </div>
         </div>

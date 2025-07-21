@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from datetime import timedelta
 import uuid
@@ -14,6 +15,13 @@ from auth import (
     get_user_roles,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
+from oauth import (
+    OAUTH2_CLIENT_ID, OAUTH2_CLIENT_SECRET, OAUTH2_AUTH_URL,
+    OAUTH2_TOKEN_URL, OAUTH2_USERINFO_URL, OAUTH2_SCOPES, OAUTH2_REDIRECT_URI, CUSTOM_LOAD,OAUTH2_API_KEY
+)
+import requests
+from rauth import OAuth2Service
+import json
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
@@ -93,3 +101,100 @@ async def read_users_me(
         email=current_user.email,
         roles=roles
     ) 
+
+@router.get("/login")
+def login():
+    state = str(uuid.uuid4())
+    service = OAuth2Service(
+        name="custom",
+        client_id=OAUTH2_CLIENT_ID,
+        client_secret=OAUTH2_CLIENT_SECRET,
+        authorize_url=OAUTH2_AUTH_URL,
+        access_token_url=OAUTH2_TOKEN_URL,
+        base_url=OAUTH2_USERINFO_URL  # Not always used, but required by rauth
+    )
+    params = {
+        "client_id": OAUTH2_CLIENT_ID,
+        "redirect_uri": OAUTH2_REDIRECT_URI,
+        "scope": OAUTH2_SCOPES,
+        "response_type": "code",
+        "state": state,
+        "api-key": OAUTH2_API_KEY
+    }
+    authorize_url = service.get_authorize_url(**params)
+    return RedirectResponse(authorize_url)
+
+@router.get("/callback")
+def callback(code: str = Query(...), state: str = Query(None)):
+    print("OAuth2 state received:", state)
+    service = OAuth2Service(
+        name="custom",
+        client_id=OAUTH2_CLIENT_ID,
+        client_secret=OAUTH2_CLIENT_SECRET,
+        authorize_url=OAUTH2_AUTH_URL,
+        access_token_url=OAUTH2_TOKEN_URL,
+        base_url=OAUTH2_USERINFO_URL
+    )
+    data = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": OAUTH2_REDIRECT_URI,
+        "client_id": OAUTH2_CLIENT_ID,
+        "client_secret": OAUTH2_CLIENT_SECRET
+    }
+    headers = {}
+    
+    session = service.get_auth_session(
+        data=data,
+        decoder=lambda b: json.loads(b.decode()),
+        headers=headers
+    )
+    # Fetch user info
+    userinfo_headers = {"Authorization": f"Bearer {session.access_token}"}
+    params = {"api-key": OAUTH2_API_KEY}
+    
+    userinfo_resp = session.get(OAUTH2_USERINFO_URL, headers=userinfo_headers, params=params)
+    if not userinfo_resp.ok:
+        raise HTTPException(status_code=400, detail="Failed to fetch user info")
+    userinfo = userinfo_resp.json()
+    email = userinfo.get("email")
+    if not email:
+        raise HTTPException(status_code=400, detail="No email in user info")
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == email).first()
+        if user:
+            if user.is_active:
+                # Log in the user: issue access token and redirect to frontend dashboard with token
+                access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+                from auth import create_access_token
+                access_token = create_access_token(
+                    data={"sub": user.id}, expires_delta=access_token_expires
+                )
+                # Redirect to frontend dashboard with token
+                return RedirectResponse(
+                    url=f"http://localhost:8080/dashboard?token={access_token}"
+                )
+            else:
+                # User is not active (locked or pending review)
+                return RedirectResponse(
+                    url="http://localhost:8080/auth?message=Your account is pending review by an administrator."
+                )
+        else:
+            import uuid
+            user_id = str(uuid.uuid4())
+            new_user = User(
+                id=user_id,
+                email=email,
+                display_name=userinfo.get("name", ""),
+                is_active=False,
+                password_hash="oauth2"  # or "" if you prefer
+            )
+            db.add(new_user)
+            db.add(UserRole(user_id=user_id, role="guest"))
+            db.commit()
+            return RedirectResponse(
+                url="http://localhost:8080/auth?message=Your account is pending review by an administrator."
+            )
+    finally:    
+        db.close() 

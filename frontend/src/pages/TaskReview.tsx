@@ -7,6 +7,7 @@ import { useCycleCountTaskById, useCycleCountItems } from "@/hooks/useCycleCount
 import { useProfiles } from "@/hooks/useProfiles";
 import { useAssets } from "@/hooks/useAssets";
 import AssetList from "@/components/AssetList";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 const TaskReview = () => {
   const navigate = useNavigate();
@@ -208,35 +209,23 @@ const TaskReview = () => {
             </Card>
           </div>
 
-          {/* Asset Details */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Counted Assets ({countedAssets.length})</CardTitle>
-            </CardHeader>
-            <CardContent>
+          {/* Asset Details Tabs */}
+          <Tabs defaultValue="counted" className="w-full mt-6">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="counted">Counted ({countedAssets.length})</TabsTrigger>
+              <TabsTrigger value="missing">Missing ({missingAssets.length})</TabsTrigger>
+              <TabsTrigger value="temporary">Temporary ({tempAssets.length})</TabsTrigger>
+            </TabsList>
+            <TabsContent value="counted" className="mt-4">
               <AssetList assets={countedAssets} onAssetToggle={() => {}} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Missing Assets ({missingAssets.length})</CardTitle>
-            </CardHeader>
-            <CardContent>
+            </TabsContent>
+            <TabsContent value="missing" className="mt-4">
               <AssetList assets={missingAssets} onAssetToggle={() => {}} />
-            </CardContent>
-          </Card>
-
-          {tempAssets.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Temporary Assets ({tempAssets.length})</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <AssetList assets={tempAssets} onAssetToggle={() => {}} />
-              </CardContent>
-            </Card>
-          )}
+            </TabsContent>
+            <TabsContent value="temporary" className="mt-4">
+              <AssetList assets={tempAssets} onAssetToggle={() => {}} />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>

@@ -25,15 +25,21 @@ export interface CycleCountItem {
   updated_at: string;
 }
 
-export const useCycleCountTasks = (userRole?: string, userId?: string) => {
+export const useCycleCountTasks = (
+  userRole?: string, 
+  userId?: string, 
+  page: number = 1, 
+  pageSize: number = 20,
+  statusFilter: string = 'all'
+) => {
   return useQuery({
-    queryKey: ['cycle_count_tasks', userRole, userId],
+    queryKey: ['cycle_count_tasks', userRole, userId, page, pageSize, statusFilter],
     queryFn: async () => {
-      if (!userId) return [];
-      
-      // For now, get all tasks - filtering can be added later
-      const data = await fastapiClient.get<CycleCountTask[]>('/cycle-count-tasks');
-      return data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      if (!userId) return { items: [], total: 0 };
+      const skip = (page - 1) * pageSize;
+      const statusParam = statusFilter ? `&status=${encodeURIComponent(statusFilter)}` : '';
+      const data = await fastapiClient.get<{ items: CycleCountTask[]; total: number }>(`/cycle-count-tasks?skip=${skip}&limit=${pageSize}${statusParam}`);
+      return data;
     },
     enabled: !!userId,
   });
@@ -58,7 +64,7 @@ export const useCycleCountItems = (taskId?: string) => {
     queryFn: async () => {
       if (!taskId) return [];
       
-      const data = await fastapiClient.get<CycleCountItem[]>(`/cycle-count-items?task_id=${taskId}`);
+      const data = await fastapiClient.get<CycleCountItem[]>(`/cycle-count-items/task/${taskId}`);
       return data.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
     },
     enabled: !!taskId,

@@ -35,22 +35,7 @@ export const useCycleCountLogic = (taskId: string | undefined) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showCompletionSummary, setShowCompletionSummary] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
-  const [scannedAssets, setScannedAssets] = useState<any[]>([]); // Store asset details for scanned items
   const { toast } = useToast();
-
-  // Fetch asset details for all scanned items
-  useEffect(() => {
-    const uniqueIds = [...new Set((cycleCountItems || []).map(item => item.asset_id))];
-    if (uniqueIds.length === 0) {
-      setScannedAssets([]);
-      return;
-    }
-    Promise.all(
-      uniqueIds.map(id =>
-        fastapiClient.get(`/assets/${id}`).catch(() => null)
-      )
-    ).then(results => setScannedAssets(results.filter(Boolean)));
-  }, [cycleCountItems]);
 
   const currentTaskLocation = currentTask?.location_filter 
     ? locations.find(loc => loc.id === currentTask.location_filter)?.name || 'Unknown location'
@@ -197,6 +182,7 @@ export const useCycleCountLogic = (taskId: string | undefined) => {
       await updateTask.mutateAsync({
         id: taskId,
         updates: {
+          name: currentTask.name, // Always include name
           status: 'completed',
           completed_at: new Date().toISOString(),
         },
@@ -216,12 +202,6 @@ export const useCycleCountLogic = (taskId: string | undefined) => {
     }
   };
 
-  // Filter scanned assets by search term
-  const filteredScannedAssets = (scannedAssets || []).filter(asset =>
-    asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (asset.barcode && asset.barcode.includes(searchTerm))
-  );
-
   return {
     showScanner,
     setShowScanner,
@@ -234,8 +214,6 @@ export const useCycleCountLogic = (taskId: string | undefined) => {
     currentTaskLocation,
     isLoading: false,
     scannedItems: cycleCountItems || [],
-    scannedAssets: scannedAssets || [],
-    filteredScannedAssets,
     hasStarted,
     handleScanSuccess,
     handleManualEntry,

@@ -4,10 +4,11 @@ import { useAuth } from '@/contexts/FastAPIAuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { fastapiClient } from '@/integrations/fastapi/client';
 
 const OAuthCallback = () => {
   const navigate = useNavigate();
-  const { handleOAuthCallback, user } = useAuth();
+  const { setUser } = useAuth();
   const { data: userRole } = useUserRole();
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(true);
@@ -27,62 +28,27 @@ const OAuthCallback = () => {
           throw new Error('No authorization code received');
         }
 
-        // Debug: Log all URL parameters
-        console.log('Full callback URL:', window.location.href);
-        console.log('All URL parameters:', Object.fromEntries(urlParams.entries()));
-
-        // Get session ID from state parameter and retrieve config from database
-        const state = urlParams.get('state');
-        let config;
-
-        if (!state) {
-          console.error('No state parameter in callback URL');
-          console.error('Available parameters:', Object.fromEntries(urlParams.entries()));
-          throw new Error('No state parameter received from OAuth provider. This may be a configuration issue with the OAuth provider.');
-        }
-
-        console.log('Retrieving OAuth config from database with session ID:', state);
-
-        // Retrieve configuration from database using session ID
-        const { data: sessionData, error: sessionError } = await supabase
-          .from('oauth_sessions')
-          .select('config')
-          .eq('id', state)
-          .single();
-
-        if (sessionError || !sessionData) {
-          console.error('Failed to retrieve OAuth session:', sessionError);
-          throw new Error(`OAuth session not found or expired: ${sessionError?.message}`);
-        }
-
-        config = sessionData.config;
-        console.log('OAuth config retrieved from database for provider:', config?.provider || 'unknown');
-
-        // Clean up the OAuth session from database
-        try {
-          await supabase
-            .from('oauth_sessions')
-            .delete()
-            .eq('id', state);
-          console.log('OAuth session cleaned up successfully');
-        } catch (cleanupError) {
-          console.warn('Failed to cleanup OAuth session:', cleanupError);
-          // Continue anyway - this is not critical
-        }
-
-        console.log('Using OAuth config for provider:', config?.provider || 'unknown');
-
-        // Handle the OAuth callback
-        const { error: callbackError } = await handleOAuthCallback(code, config);
-
-        if (callbackError) {
-          throw callbackError;
-        }
-
-        // Wait a moment for auth state to update
-        setTimeout(() => {
+        // Call FastAPI backend /auth/callback
+        const resp = await fastapiClient.get(`/auth/callback?code=${encodeURIComponent(code)}`);
+        if (resp.status === 'active') {
+          // Set user info in global auth context
+          setUser(resp.user);
           setIsProcessing(false);
-        }, 1000);
+          toast({
+            title: "Authentication Successful",
+            description: "You have been signed in successfully.",
+          });
+          navigate('/dashboard');
+        } else if (resp.status === 'pending_review') {
+          toast({
+            title: "Account Pending Review",
+            description: resp.message || "Your account is pending review by an administrator.",
+            variant: "default",
+          });
+          navigate('/auth');
+        } else {
+          throw new Error('Unknown authentication status');
+        }
       } catch (error: any) {
         console.error('OAuth callback error:', error);
         toast({
@@ -93,14 +59,12 @@ const OAuthCallback = () => {
         navigate('/auth');
       }
     };
-
-    // Only run once when component mounts
     handleCallback();
-  }, []); // Empty dependency array to prevent multiple executions
+  }, [navigate, toast, setUser]);
 
   // Handle navigation after user and role are available
   useEffect(() => {
-    if (!isProcessing && user && userRole !== undefined) {
+    if (!isProcessing && userRole !== undefined) {
       if (userRole === 'guest') {
         toast({
           title: "Account Created",
@@ -116,7 +80,7 @@ const OAuthCallback = () => {
         navigate('/dashboard');
       }
     }
-  }, [isProcessing, user, userRole, navigate, toast]);
+  }, [isProcessing, userRole, navigate, toast]);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">

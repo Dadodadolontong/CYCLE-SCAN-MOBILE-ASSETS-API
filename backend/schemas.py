@@ -234,9 +234,15 @@ class CycleCountItemCreate(CycleCountItemBase):
 class CycleCountItemUpdate(CycleCountItemBase):
     pass
 
-class CycleCountItemOut(CycleCountItemBase):
+class CycleCountItemOut(BaseModel):
     id: str
+    task_id: str
+    asset_id: str
+    expected_location: Optional[str]
+    status: str
+    actual_location: Optional[str]
+    counted_at: Optional[datetime]
+    counted_by: Optional[str]
+    notes: Optional[str]
     created_at: datetime
-
-    class Config:
-        from_attributes = True 
+    asset: Optional[AssetOut] = None 
