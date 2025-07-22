@@ -24,6 +24,7 @@ from routes_temp_assets import router as temp_assets_router
 from routes_cycle_count_tasks import router as cycle_count_tasks_router
 from routes_cycle_count_items import router as cycle_count_items_router
 from routes_admin import router as admin_router
+from routes_asset_transfer import router as asset_transfer_router
 
 load_dotenv()
 
@@ -95,6 +96,7 @@ app.include_router(cycle_count_tasks_router)
 app.include_router(cycle_count_items_router)
 app.include_router(auth_router)
 app.include_router(admin_router)
+app.include_router(asset_transfer_router)
 
 @app.get("/")
 def read_root():

@@ -251,3 +251,33 @@ class OAuthSession(Base):
     config = Column(JSON, nullable=False)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     expires_at = Column(DateTime) 
+
+class AssetTransfer(Base):
+    __tablename__ = 'asset_transfers'
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    transfer_number = Column(String(64), unique=True, nullable=False)
+    source_location_id = Column(String(36), ForeignKey('locations.id'), nullable=False)
+    destination_location_id = Column(String(36), ForeignKey('locations.id'), nullable=False)
+    created_by = Column(String(36), ForeignKey('users.id'), nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    status = Column(String(32), default='pending')
+    items = relationship('AssetTransferItem', back_populates='transfer', cascade='all, delete-orphan')
+    approvals = relationship('AssetTransferApproval', back_populates='transfer', cascade='all, delete-orphan')
+
+class AssetTransferItem(Base):
+    __tablename__ = 'asset_transfer_items'
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    transfer_id = Column(String(36), ForeignKey('asset_transfers.id'), nullable=False)
+    asset_id = Column(String(36), ForeignKey('assets.id'), nullable=False)
+    barcode = Column(String(64), nullable=False)
+    transfer = relationship('AssetTransfer', back_populates='items')
+
+class AssetTransferApproval(Base):
+    __tablename__ = 'asset_transfer_approvals'
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    transfer_id = Column(String(36), ForeignKey('asset_transfers.id'), nullable=False)
+    approver_id = Column(String(36), ForeignKey('users.id'), nullable=False)
+    role = Column(String(32), nullable=False)  # controller, receiving_controller, receiving_manager
+    status = Column(String(32), default='pending')  # pending, approved, rejected
+    approved_at = Column(DateTime)
+    transfer = relationship('AssetTransfer', back_populates='approvals') 

@@ -246,3 +246,48 @@ class CycleCountItemOut(BaseModel):
     notes: Optional[str]
     created_at: datetime
     asset: Optional[AssetOut] = None 
+
+class AssetTransferItemBase(BaseModel):
+    asset_id: str
+    barcode: str
+
+class AssetTransferItemCreate(AssetTransferItemBase):
+    pass
+
+class AssetTransferItemOut(AssetTransferItemBase):
+    id: str
+    class Config:
+        from_attributes = True
+
+class AssetTransferApprovalBase(BaseModel):
+    approver_id: str
+    role: str
+    status: str = 'pending'
+    approved_at: Optional[datetime] = None
+
+class AssetTransferApprovalCreate(AssetTransferApprovalBase):
+    pass
+
+class AssetTransferApprovalOut(AssetTransferApprovalBase):
+    id: str
+    class Config:
+        from_attributes = True
+
+class AssetTransferBase(BaseModel):
+    source_location_id: str
+    destination_location_id: str
+    items: List[AssetTransferItemCreate]
+
+class AssetTransferCreate(AssetTransferBase):
+    pass
+
+class AssetTransferOut(AssetTransferBase):
+    id: str
+    transfer_number: str
+    created_by: str
+    created_at: datetime
+    status: str
+    items: List[AssetTransferItemOut]
+    approvals: List[AssetTransferApprovalOut]
+    class Config:
+        from_attributes = True 

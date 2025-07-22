@@ -100,6 +100,24 @@ const Dashboard = () => {
       </div>
 
       <div className="container mx-auto p-6 max-w-7xl">
+       {/* <div className="mb-8 flex flex-wrap gap-4">
+          <Button
+            variant="default"
+            onClick={() => navigate('/create-task')}
+          >
+            Create Task
+          </Button> */}
+          {/* Show Create Asset Transfer only for managers */}
+          {/*{userRole === 'manager' && (
+            <Button
+              variant="secondary"
+              onClick={() => navigate('/asset-transfer/create')}
+            >
+              Create Asset Transfer
+            </Button>
+          )}
+        </div>*/}
+
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-foreground mb-2">
             Asset Management Dashboard
@@ -167,6 +185,18 @@ const Dashboard = () => {
             <CalendarDays className="mr-2 h-5 w-5" />
             Create Cycle Count Task
           </Button>
+          {/* Create Asset Transfer button for managers */}
+          {userRole === 'manager' && (
+            <Button
+              onClick={() => navigate('/asset-transfer/create')}
+              size="lg"
+              className="h-20 text-lg"
+              variant="secondary"
+            >
+              <Package className="mr-2 h-5 w-5" />
+              Create Asset Transfer
+            </Button>
+          )}
           <Button 
             size="lg" 
             className="h-20 text-lg"

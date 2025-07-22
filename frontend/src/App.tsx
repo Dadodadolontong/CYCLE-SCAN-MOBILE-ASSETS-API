@@ -17,6 +17,7 @@ import TaskReview from "./pages/TaskReview";
 import DataImport from "./pages/DataImport";
 import { TestCsvUpload } from "./pages/TestCsvUpload";
 import NotFound from "./pages/NotFound";
+import AssetTransferCreate from "./pages/AssetTransferCreate";
 
 const queryClient = new QueryClient();
 
@@ -70,6 +71,7 @@ const App = () => (
                 <TestCsvUpload />
               </AdminRoute>
             } />
+            <Route path="/asset-transfer/create" element={<AssetTransferCreate />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
