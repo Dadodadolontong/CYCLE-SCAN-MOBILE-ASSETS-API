@@ -1,0 +1,5 @@
+name,erp_asset_id,location-name,barcode,category,model,build,status
+Laptop Dell XPS,ASSET001,Office Building A,LP001,Electronics,Dell XPS 13,2023,Active
+Forklift Toyota,ASSET002,Main Warehouse,FL001,Equipment,Toyota 8FGCU25,2022,Active
+Server HP ProLiant,ASSET003,Office Building A,SRV001,Electronics,HP ProLiant DL380,2023,Active
+Pallet Jack,ASSET004,Main Warehouse,PJ001,Equipment,Manual Pallet Jack,2021,Active 

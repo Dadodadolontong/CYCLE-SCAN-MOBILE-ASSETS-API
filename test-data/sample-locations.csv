@@ -1,0 +1,5 @@
+location-name,description,erp_location_id,branch-name
+Main Warehouse,Primary storage facility,WH001,North America
+Office Building A,Administrative offices,OFF001,North America
+Production Plant,Manufacturing facility,PLANT001,Europe
+Storage Facility B,Secondary storage,WH002,Asia Pacific 
