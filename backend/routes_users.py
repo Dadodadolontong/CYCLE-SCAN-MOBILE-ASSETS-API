@@ -4,7 +4,7 @@ from typing import List, Optional
 from models import User, UserRole, Profile
 from db import SessionLocal
 from schemas import UserCreate, UserUpdate, UserOut
-from utils import get_current_user
+from auth import get_current_user
 
 router = APIRouter(prefix="/users", tags=["users"])
 
