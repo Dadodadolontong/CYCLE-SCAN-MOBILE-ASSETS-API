@@ -291,3 +291,27 @@ class AssetTransferOut(AssetTransferBase):
     approvals: List[AssetTransferApprovalOut]
     class Config:
         from_attributes = True 
+
+class OAuthProviderBase(BaseModel):
+    name: str
+    client_id: str
+    auth_url: str
+    token_url: str
+    user_info_url: str
+    scopes: str = ''
+    is_active: bool = True
+
+class OAuthProviderCreate(OAuthProviderBase):
+    pass
+
+class OAuthProviderUpdate(OAuthProviderBase):
+    pass
+
+class OAuthProviderOut(OAuthProviderBase):
+    id: str
+    created_by: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True 
