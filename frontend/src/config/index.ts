@@ -22,6 +22,13 @@ interface Config {
 // Check if we're in development mode
 const isDevMode = import.meta.env.DEV;
 
+console.log("🔍 [Config] Environment variables:", {
+  VITE_API_URL: import.meta.env.VITE_API_URL,
+  VITE_FRONTEND_URL: import.meta.env.VITE_FRONTEND_URL,
+  VITE_FRONTEND_PORT: import.meta.env.VITE_FRONTEND_PORT,
+  isDevMode
+});
+
 // Validate required environment variables only in production
 if (!isDevMode) {
   const requiredEnvVars = [
@@ -57,6 +64,13 @@ export const config: Config = {
     analytics: import.meta.env.VITE_ENABLE_ANALYTICS === 'true',
   },
 };
+
+console.log("🔍 [Config] Final config values:", {
+  apiUrl: config.api.url,
+  frontendUrl: config.frontend.url,
+  frontendPort: config.frontend.port,
+  environment: config.environment
+});
 
 // Helper functions
 export const getApiUrl = (endpoint: string = ''): string => {

@@ -16,7 +16,7 @@ def get_db():
     finally:
         db.close()
 
-@router.get("/", response_model=List[AssetOut])
+@router.get("", response_model=List[AssetOut])
 def list_assets(
     skip: int = 0, 
     limit: int = 100,

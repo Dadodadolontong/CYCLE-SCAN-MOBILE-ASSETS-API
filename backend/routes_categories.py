@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from models import Category
 from db import SessionLocal
 from schemas import CategoryCreate, CategoryUpdate, CategoryOut
@@ -15,10 +15,11 @@ def get_db():
     finally:
         db.close()
 
-@router.get("/", response_model=List[CategoryOut])
+@router.get("", response_model=List[CategoryOut])
 def list_categories(
-    skip: int = 0, 
-    limit: int = 100, 
+    skip: int = 0,
+    limit: int = 100,
+    search: Optional[str] = Query(None, description="Search in name"),
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
@@ -26,7 +27,7 @@ def list_categories(
 
 @router.get("/{category_id}", response_model=CategoryOut)
 def get_category(
-    category_id: str, 
+    category_id: str,
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
@@ -37,7 +38,7 @@ def get_category(
 
 @router.post("/", response_model=CategoryOut)
 def create_category(
-    category: CategoryCreate, 
+    category: CategoryCreate,
     db: Session = Depends(get_db),
     current_user = Depends(require_role("admin"))
 ):
@@ -49,8 +50,8 @@ def create_category(
 
 @router.put("/{category_id}", response_model=CategoryOut)
 def update_category(
-    category_id: str, 
-    category: CategoryUpdate, 
+    category_id: str,
+    category: CategoryUpdate,
     db: Session = Depends(get_db),
     current_user = Depends(require_role("admin"))
 ):
@@ -65,7 +66,7 @@ def update_category(
 
 @router.delete("/{category_id}")
 def delete_category(
-    category_id: str, 
+    category_id: str,
     db: Session = Depends(get_db),
     current_user = Depends(require_role("admin"))
 ):

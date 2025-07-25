@@ -205,6 +205,7 @@ let _fastapiClient: FastAPIClient | null = null;
 
 export const fastapiClient = (() => {
   if (!_fastapiClient) {
+    console.log("🔍 [FastAPIClient] Initializing with API URL:", config.api.url);
     _fastapiClient = new FastAPIClient(config.api.url);
   }
   return _fastapiClient;
