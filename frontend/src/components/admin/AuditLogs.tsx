@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { supabase } from '@/integrations/supabase/client';
 import { Shield, Search, Filter, AlertCircle } from 'lucide-react';
 
 interface AuditLog {
@@ -30,21 +29,20 @@ export const AuditLogs = () => {
     queryKey: ['audit-logs'],
     queryFn: async () => {
       // First get audit logs
-      const { data: logs, error } = await supabase
-        .from('audit_logs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      if (error) throw error;
+      const response = await fetch('/api/audit-logs');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const logs: AuditLog[] = await response.json();
 
       // Get user profiles for display names
       const userIds = [...new Set(logs.map(log => log.user_id).filter(Boolean))];
       if (userIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, display_name')
-          .in('id', userIds);
+        const response = await fetch(`/api/profiles?ids=${userIds.join(',')}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const profiles = await response.json();
 
         // Merge user display names
         const logsWithUsers = logs.map(log => ({
@@ -62,11 +60,11 @@ export const AuditLogs = () => {
   const { data: stats } = useQuery({
     queryKey: ['audit-stats'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('audit_logs')
-        .select('action, resource_type');
-
-      if (error) throw error;
+      const response = await fetch('/api/audit-stats');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
 
       const actions = [...new Set(data.map(log => log.action))];
       const resources = [...new Set(data.map(log => log.resource_type))];

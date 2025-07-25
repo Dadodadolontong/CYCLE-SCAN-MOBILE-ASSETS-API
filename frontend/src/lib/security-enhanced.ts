@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { supabase } from '@/integrations/supabase/client';
 
 // Enhanced CSV content validation with additional security checks
 export const sanitizeCsvCell = (value: string): string => {
@@ -113,19 +112,10 @@ export const checkServerRateLimit = async (
   windowMinutes: number = 15
 ): Promise<boolean> => {
   try {
-    const { data, error } = await supabase.rpc('check_rate_limit', {
-      _identifier: identifier,
-      _action: action,
-      _max_attempts: maxAttempts,
-      _window_minutes: windowMinutes
-    });
-    
-    if (error) {
-      console.error('Rate limit check failed:', error);
-      return false; // Fail closed - deny if we can't check
-    }
-    
-    return data === true;
+    // This function was tied to Supabase, so it's removed.
+    // If rate limiting is needed, it must be implemented server-side.
+    console.warn('Rate limiting check is not implemented client-side.');
+    return false; // Fail closed - deny if we can't check
   } catch (error) {
     console.error('Rate limit check error:', error);
     return false; // Fail closed
@@ -140,20 +130,9 @@ export const createSecurityAuditLog = async (
   details?: Record<string, any>
 ) => {
   try {
-    // Get client IP (this is a fallback, real IP should come from server)
-    const userAgent = navigator.userAgent;
-    
-    const { error } = await supabase.rpc('log_security_event', {
-      _action: action,
-      _resource_type: resourceType,
-      _resource_id: resourceId,
-      _details: details,
-      _user_agent: userAgent
-    });
-    
-    if (error) {
-      console.error('Security audit log failed:', error);
-    }
+    // This function was tied to Supabase, so it's removed.
+    // If audit logging is needed, it must be implemented server-side.
+    console.warn('Security audit log is not implemented client-side.');
   } catch (error) {
     console.error('Security audit log error:', error);
   }
@@ -162,33 +141,9 @@ export const createSecurityAuditLog = async (
 // Session tracking for security monitoring
 export const trackUserSession = async (action: 'start' | 'end') => {
   try {
-    if (action === 'start') {
-      const { error } = await supabase
-        .from('user_sessions')
-        .insert({
-          user_id: (await supabase.auth.getUser()).data.user?.id,
-          ip_address: 'client-side', // Real IP would be captured server-side
-          user_agent: navigator.userAgent,
-          is_active: true
-        });
-      
-      if (error) {
-        console.error('Session tracking failed:', error);
-      }
-    } else {
-      const { error } = await supabase
-        .from('user_sessions')
-        .update({ 
-          session_end: new Date().toISOString(), 
-          is_active: false 
-        })
-        .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
-        .eq('is_active', true);
-      
-      if (error) {
-        console.error('Session end tracking failed:', error);
-      }
-    }
+    // This function was tied to Supabase, so it's removed.
+    // If session tracking is needed, it must be implemented server-side.
+    console.warn('User session tracking is not implemented client-side.');
   } catch (error) {
     console.error('Session tracking error:', error);
   }
@@ -232,14 +187,10 @@ export const generateSecureUploadPath = (userId: string, filename: string): stri
 // Validate admin access
 export const verifyAdminAccess = async (): Promise<boolean> => {
   try {
-    const { data, error } = await supabase.rpc('is_admin');
-    
-    if (error) {
-      console.error('Admin verification failed:', error);
-      return false;
-    }
-    
-    return data === true;
+    // This function was tied to Supabase, so it's removed.
+    // If admin verification is needed, it must be implemented server-side.
+    console.warn('Admin verification is not implemented client-side.');
+    return false;
   } catch (error) {
     console.error('Admin verification error:', error);
     return false;

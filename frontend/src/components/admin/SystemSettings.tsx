@@ -7,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Settings, Save, AlertCircle } from 'lucide-react';
 
@@ -27,13 +26,12 @@ export const SystemSettings = () => {
   const { data: systemSettings, isLoading } = useQuery({
     queryKey: ['system-settings'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('system_settings')
-        .select('*')
-        .order('setting_key');
+      const response = await fetch('/api/system-settings');
+      if (!response.ok) {
+        throw new Error('Failed to fetch system settings');
+      }
+      const data: SystemSetting[] = await response.json();
 
-      if (error) throw error;
-      
       const settingsMap: Record<string, any> = {};
       data.forEach((setting: SystemSetting) => {
         settingsMap[setting.setting_key] = setting.setting_value;
@@ -46,21 +44,28 @@ export const SystemSettings = () => {
 
   const updateSettingsMutation = useMutation({
     mutationFn: async (updatedSettings: Record<string, any>) => {
-      const updates = Object.entries(updatedSettings).map(([key, value]) => ({
-        setting_key: key,
-        setting_value: value
-      }));
+      const response = await fetch('/api/system-settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedSettings),
+      });
 
-      for (const update of updates) {
-        await supabase
-          .from('system_settings')
-          .upsert(update, { onConflict: 'setting_key' });
+      if (!response.ok) {
+        throw new Error('Failed to update system settings');
       }
 
-      await supabase.rpc('log_admin_action', {
-        _action: 'update_system_settings',
-        _resource_type: 'system_settings',
-        _details: { updated_keys: Object.keys(updatedSettings) }
+      await fetch('/api/log-admin-action', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          _action: 'update_system_settings',
+          _resource_type: 'system_settings',
+          _details: { updated_keys: Object.keys(updatedSettings) }
+        }),
       });
     },
     onSuccess: () => {

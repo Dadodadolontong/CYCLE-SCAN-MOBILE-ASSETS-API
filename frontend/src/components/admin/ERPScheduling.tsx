@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { GitBranch, Plus, Settings, Play, Calendar, Clock } from 'lucide-react';
 
@@ -25,46 +24,40 @@ export const ERPScheduling = () => {
   const { data: syncLogs, isLoading } = useQuery({
     queryKey: ['erp-sync-logs'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('sync_logs')
-        .select('*')
-        .order('started_at', { ascending: false })
-        .limit(10);
-
-      if (error) throw error;
-      return data;
+      const response = await fetch('/api/erp/sync-logs');
+      if (!response.ok) {
+        throw new Error('Failed to fetch sync logs');
+      }
+      return response.json();
     }
   });
 
   const { data: scheduledSyncs } = useQuery({
     queryKey: ['scheduled-syncs'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('sync_logs')
-        .select('*')
-        .not('schedule_type', 'is', null)
-        .not('next_run_at', 'is', null)
-        .order('next_run_at', { ascending: true });
-
-      if (error) throw error;
-      return data;
+      const response = await fetch('/api/erp/scheduled-syncs');
+      if (!response.ok) {
+        throw new Error('Failed to fetch scheduled syncs');
+      }
+      return response.json();
     }
   });
 
   const manualSyncMutation = useMutation({
     mutationFn: async (syncType: string) => {
-      const { data, error } = await supabase.functions.invoke(`sync-${syncType}`, {
-        body: { manual: true }
+      const response = await fetch(`/api/erp/sync/${syncType}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ manual: true }),
       });
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error('Failed to start manual sync');
+      }
 
-      await supabase.rpc('log_admin_action', {
-        _action: 'manual_erp_sync',
-        _resource_type: 'sync',
-        _details: { sync_type: syncType }
-      });
-
+      const data = await response.json();
       return data;
     },
     onSuccess: (data, syncType) => {
@@ -107,28 +100,23 @@ export const ERPScheduling = () => {
         nextRun.setHours(parseInt(hours), parseInt(minutes), 0, 0);
       }
 
-      const { error } = await supabase
-        .from('sync_logs')
-        .insert({
+      const response = await fetch('/api/erp/schedule-sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           sync_type: scheduleForm.sync_type,
-          status: 'scheduled',
           schedule_type: scheduleForm.schedule_type,
-          scheduled_at: now.toISOString(),
           next_run_at: nextRun.toISOString()
-        });
-
-      if (error) throw error;
-
-      await supabase.rpc('log_admin_action', {
-        _action: 'schedule_erp_sync',
-        _resource_type: 'sync',
-        _details: { 
-          sync_type: scheduleForm.sync_type,
-          schedule_type: scheduleForm.schedule_type,
-          next_run: nextRun.toISOString()
-        }
+        }),
       });
 
+      if (!response.ok) {
+        throw new Error('Failed to schedule sync');
+      }
+
+      const data = await response.json();
       queryClient.invalidateQueries({ queryKey: ['scheduled-syncs'] });
       setIsScheduleDialogOpen(false);
       setScheduleForm({ sync_type: '', schedule_type: '', schedule_time: '' });

@@ -8,7 +8,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Shield, Edit, Trash2 } from 'lucide-react';
 
@@ -42,36 +41,38 @@ export const OAuthConfiguration = () => {
   const { data: providers, isLoading } = useQuery({
     queryKey: ['oauth-providers'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('oauth_providers')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return data as OAuthProvider[];
+      const response = await fetch('/api/oauth-providers');
+      if (!response.ok) {
+        throw new Error('Failed to fetch OAuth providers');
+      }
+      return response.json() as Promise<OAuthProvider[]>;
     }
   });
 
   const createProviderMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const { error } = await supabase
-        .from('oauth_providers')
-        .insert({
-          name: data.name,
-          client_id: data.client_id,
-          auth_url: data.auth_url,
-          token_url: data.token_url,
-          user_info_url: data.user_info_url,
-          scopes: data.scopes.split(',').map(s => s.trim()),
-          is_active: data.is_active
-        });
+      const response = await fetch('/api/oauth-providers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error('Failed to create OAuth provider');
+      }
 
-      await supabase.rpc('log_admin_action', {
-        _action: 'create_oauth_provider',
-        _resource_type: 'oauth_provider',
-        _details: { provider_name: data.name }
+      await fetch('/api/log-admin-action', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          _action: 'create_oauth_provider',
+          _resource_type: 'oauth_provider',
+          _details: { provider_name: data.name }
+        }),
       });
     },
     onSuccess: () => {
@@ -94,26 +95,29 @@ export const OAuthConfiguration = () => {
 
   const updateProviderMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: typeof formData }) => {
-      const { error } = await supabase
-        .from('oauth_providers')
-        .update({
-          name: data.name,
-          client_id: data.client_id,
-          auth_url: data.auth_url,
-          token_url: data.token_url,
-          user_info_url: data.user_info_url,
-          scopes: data.scopes.split(',').map(s => s.trim()),
-          is_active: data.is_active
-        })
-        .eq('id', id);
+      const response = await fetch(`/api/oauth-providers/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error('Failed to update OAuth provider');
+      }
 
-      await supabase.rpc('log_admin_action', {
-        _action: 'update_oauth_provider',
-        _resource_type: 'oauth_provider',
-        _resource_id: id,
-        _details: { provider_name: data.name }
+      await fetch('/api/log-admin-action', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          _action: 'update_oauth_provider',
+          _resource_type: 'oauth_provider',
+          _resource_id: id,
+          _details: { provider_name: data.name }
+        }),
       });
     },
     onSuccess: () => {
@@ -137,17 +141,24 @@ export const OAuthConfiguration = () => {
 
   const deleteProviderMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('oauth_providers')
-        .delete()
-        .eq('id', id);
+      const response = await fetch(`/api/oauth-providers/${id}`, {
+        method: 'DELETE',
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error('Failed to delete OAuth provider');
+      }
 
-      await supabase.rpc('log_admin_action', {
-        _action: 'delete_oauth_provider',
-        _resource_type: 'oauth_provider',
-        _resource_id: id
+      await fetch('/api/log-admin-action', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          _action: 'delete_oauth_provider',
+          _resource_type: 'oauth_provider',
+          _resource_id: id
+        }),
       });
     },
     onSuccess: () => {
