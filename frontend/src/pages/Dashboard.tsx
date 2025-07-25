@@ -17,6 +17,8 @@ import Pagination from "@/components/Pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const Dashboard = () => {
+  console.log("🔍 [Dashboard] Component starting to render");
+  
   const navigate = useNavigate();
   const location = useLocation();
   const { user, setUser } = useAuth();
@@ -24,23 +26,104 @@ const Dashboard = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [page, setPage] = useState(1);
   const pageSize = 20;
-  const { data: tasksData = { items: [], total: 0 }, isLoading: tasksLoading } = useCycleCountTasks(userRole, user?.id, page, pageSize, statusFilter);
+  
+  console.log("🔍 [Dashboard] Initial state:", {
+    user: user?.email,
+    userRole,
+    statusFilter,
+    page,
+    location: location.pathname + location.search
+  });
+
+  const { data: tasksData = { items: [], total: 0 }, isLoading: tasksLoading, error: tasksError } = useCycleCountTasks(userRole, user?.id, page, pageSize, statusFilter);
   const tasks = tasksData.items;
   const totalTasks = tasksData.total;
-  const { data: assets = [], isLoading: assetsLoading } = useAssets();
-  const { data: locations = [] } = useLocations();
-  const { data: categories = [] } = useCategories();
-  const { data: assetCount, isLoading: assetCountLoading } = useAssetCount();
+  
+  console.log("🔍 [Dashboard] Tasks data:", {
+    tasksLoading,
+    tasksError: tasksError?.message,
+    tasksCount: tasks.length,
+    totalTasks,
+    userRole,
+    userId: user?.id
+  });
+
+  const { data: assets = [], isLoading: assetsLoading, error: assetsError } = useAssets();
+  
+  console.log("🔍 [Dashboard] Assets data:", {
+    assetsLoading,
+    assetsError: assetsError?.message,
+    assetsCount: assets.length
+  });
+
+  const { data: locations = [], isLoading: locationsLoading, error: locationsError } = useLocations();
+  
+  console.log("🔍 [Dashboard] Locations data:", {
+    locationsLoading,
+    locationsError: locationsError?.message,
+    locationsCount: locations.length
+  });
+
+  const { data: categories = [], isLoading: categoriesLoading, error: categoriesError } = useCategories();
+  
+  console.log("🔍 [Dashboard] Categories data:", {
+    categoriesLoading,
+    categoriesError: categoriesError?.message,
+    categoriesCount: categories.length
+  });
+
+  const { data: assetCount, isLoading: assetCountLoading, error: assetCountError } = useAssetCount();
+  
+  console.log("🔍 [Dashboard] Asset count data:", {
+    assetCountLoading,
+    assetCountError: assetCountError?.message,
+    assetCount
+  });
 
   useEffect(() => {
+    console.log("🔍 [Dashboard] useEffect triggered - checking for token in URL");
     const params = new URLSearchParams(location.search);
     const token = params.get("token");
+    console.log("🔍 [Dashboard] URL token found:", !!token);
+    
     if (token) {
-      fastapiClient.setToken(token);
-      fastapiClient.getCurrentUser().then(setUser);
-      window.history.replaceState({}, document.title, location.pathname);
+      console.log("🔍 [Dashboard] Setting token and fetching user data");
+      try {
+        fastapiClient.setToken(token);
+        fastapiClient.getCurrentUser().then(userData => {
+          console.log("🔍 [Dashboard] User data fetched successfully:", userData?.email);
+          setUser(userData);
+        }).catch(error => {
+          console.error("🔍 [Dashboard] Error fetching user data:", error);
+        });
+        window.history.replaceState({}, document.title, location.pathname);
+        console.log("🔍 [Dashboard] URL cleaned up");
+      } catch (error) {
+        console.error("🔍 [Dashboard] Error in token handling:", error);
+      }
     }
   }, [location, setUser]);
+
+  // Debug loading states
+  useEffect(() => {
+    console.log("🔍 [Dashboard] Loading states:", {
+      tasksLoading,
+      assetsLoading,
+      locationsLoading,
+      categoriesLoading,
+      assetCountLoading,
+      allLoading: tasksLoading || assetsLoading || locationsLoading || categoriesLoading || assetCountLoading
+    });
+  }, [tasksLoading, assetsLoading, locationsLoading, categoriesLoading, assetCountLoading]);
+
+  // Debug errors
+  useEffect(() => {
+    if (tasksError) console.error("🔍 [Dashboard] Tasks error:", tasksError);
+    if (assetsError) console.error("🔍 [Dashboard] Assets error:", assetsError);
+    if (locationsError) console.error("🔍 [Dashboard] Locations error:", locationsError);
+    if (categoriesError) console.error("🔍 [Dashboard] Categories error:", categoriesError);
+    if (assetCountError) console.error("🔍 [Dashboard] Asset count error:", assetCountError);
+  }, [tasksError, assetsError, locationsError, categoriesError, assetCountError]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -61,16 +144,29 @@ const Dashboard = () => {
   const completedTasksCount = tasks.filter(task => task.status === 'completed').length;
   const totalLocations = locations.length;
 
+  console.log("🔍 [Dashboard] Computed values:", {
+    activeTasksCount,
+    completedTasksCount,
+    totalLocations
+  });
+
   if (tasksLoading || assetsLoading) {
+    console.log("🔍 [Dashboard] Showing loading screen");
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p>Loading dashboard...</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Tasks: {tasksLoading ? 'Loading' : 'Ready'} | 
+            Assets: {assetsLoading ? 'Loading' : 'Ready'}
+          </p>
         </div>
       </div>
     );
   }
+
+  console.log("🔍 [Dashboard] Rendering main dashboard content");
 
   return (
     <div className="min-h-screen bg-background">

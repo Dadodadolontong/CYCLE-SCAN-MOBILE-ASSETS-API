@@ -11,11 +11,20 @@ export interface Location {
 }
 
 export const useLocations = () => {
+  console.log("🔍 [useLocations] Hook called");
+  
   return useQuery({
     queryKey: ['locations'],
     queryFn: async () => {
-      const data = await fastapiClient.get<Location[]>('/locations');
-      return data.sort((a, b) => a.name.localeCompare(b.name));
+      console.log("🔍 [useLocations] Starting API call to /locations");
+      try {
+        const data = await fastapiClient.get<Location[]>('/locations');
+        console.log("🔍 [useLocations] API call successful, locations count:", data?.length || 0);
+        return data.sort((a, b) => a.name.localeCompare(b.name));
+      } catch (error) {
+        console.error("🔍 [useLocations] API call failed:", error);
+        throw error;
+      }
     },
   });
 };

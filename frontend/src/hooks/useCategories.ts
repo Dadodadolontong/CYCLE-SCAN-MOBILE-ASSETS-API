@@ -10,11 +10,20 @@ export interface Category {
 }
 
 export const useCategories = () => {
+  console.log("🔍 [useCategories] Hook called");
+  
   return useQuery({
     queryKey: ['categories'],
     queryFn: async () => {
-      const data = await fastapiClient.get<Category[]>('/categories');
-      return data.sort((a, b) => a.name.localeCompare(b.name));
+      console.log("🔍 [useCategories] Starting API call to /categories");
+      try {
+        const data = await fastapiClient.get<Category[]>('/categories');
+        console.log("🔍 [useCategories] API call successful, categories count:", data?.length || 0);
+        return data.sort((a, b) => a.name.localeCompare(b.name));
+      } catch (error) {
+        console.error("🔍 [useCategories] API call failed:", error);
+        throw error;
+      }
     },
   });
 };
