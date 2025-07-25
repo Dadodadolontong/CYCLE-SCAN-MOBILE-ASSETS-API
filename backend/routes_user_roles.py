@@ -4,6 +4,7 @@ from typing import List
 from models import UserRole
 from db import SessionLocal
 from schemas import UserRoleCreate, UserRoleUpdate, UserRoleOut
+from auth import get_current_user
 
 router = APIRouter(prefix="/user-roles", tags=["user-roles"])
 
@@ -14,8 +15,13 @@ def get_db():
     finally:
         db.close()
 
-@router.get("/", response_model=List[UserRoleOut])
-def list_user_roles(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+@router.get("", response_model=List[UserRoleOut])
+def list_user_roles(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
     return db.query(UserRole).offset(skip).limit(limit).all()
 
 @router.get("/{user_role_id}", response_model=UserRoleOut)

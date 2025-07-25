@@ -4,6 +4,7 @@ from typing import List
 from models import Region
 from db import SessionLocal
 from schemas import RegionCreate, RegionUpdate, RegionOut
+from auth import get_current_user
 
 router = APIRouter(prefix="/regions", tags=["regions"])
 
@@ -14,8 +15,13 @@ def get_db():
     finally:
         db.close()
 
-@router.get("/", response_model=List[RegionOut])
-def list_regions(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+@router.get("", response_model=List[RegionOut])
+def list_regions(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
     return db.query(Region).offset(skip).limit(limit).all()
 
 @router.get("/{region_id}", response_model=RegionOut)

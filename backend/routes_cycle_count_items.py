@@ -16,7 +16,7 @@ def get_db():
     finally:
         db.close()
 
-@router.get("/", response_model=Dict[str, Any])
+@router.get("", response_model=Dict[str, Any])
 def list_cycle_count_items(
     skip: int = 0,
     limit: int = 100,

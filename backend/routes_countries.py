@@ -4,6 +4,7 @@ from typing import List
 from models import Country
 from db import SessionLocal
 from schemas import CountryCreate, CountryUpdate, CountryOut
+from auth import get_current_user
 
 router = APIRouter(prefix="/countries", tags=["countries"])
 
@@ -14,8 +15,13 @@ def get_db():
     finally:
         db.close()
 
-@router.get("/", response_model=List[CountryOut])
-def list_countries(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+@router.get("", response_model=List[CountryOut])
+def list_countries(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
     return db.query(Country).offset(skip).limit(limit).all()
 
 @router.get("/{country_id}", response_model=CountryOut)

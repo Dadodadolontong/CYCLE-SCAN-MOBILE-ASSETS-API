@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from models import User, UserRole, Profile
 from db import SessionLocal
 from schemas import UserCreate, UserUpdate, UserOut
+from utils import get_current_user
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -14,8 +15,14 @@ def get_db():
     finally:
         db.close()
 
-@router.get("/", response_model=List[UserOut])
-def list_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+@router.get("", response_model=List[UserOut])
+def list_users(
+    skip: int = 0,
+    limit: int = 100,
+    search: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
     users = db.query(User).offset(skip).limit(limit).all()
     # Fetch all profiles in one go for efficiency
     # profiles = {p.id: p for p in db.query(Profile).all()}

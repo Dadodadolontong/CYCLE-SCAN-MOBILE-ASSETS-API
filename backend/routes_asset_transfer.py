@@ -24,8 +24,10 @@ def create_asset_transfer(
     service = AssetTransferService(db)
     return service.create_transfer(transfer, created_by=current_user.id)
 
-@router.get("/", response_model=List[AssetTransferOut])
+@router.get("", response_model=List[AssetTransferOut])
 def list_asset_transfers(
+    skip: int = 0,
+    limit: int = 100,
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
