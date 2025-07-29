@@ -48,8 +48,8 @@ class FastAPIClient {
       },
     };
 
-    // Only set Content-Type for JSON requests, not for FormData
-    if (!(options.body instanceof FormData)) {
+    // Only set Content-Type for JSON requests if not already set
+    if (!(options.body instanceof FormData) && !options.headers?.['Content-Type']) {
       config.headers = {
         'Content-Type': 'application/json',
         ...config.headers,
@@ -88,13 +88,17 @@ class FastAPIClient {
 
   // Authentication methods
   async login(credentials: LoginRequest): Promise<LoginResponse> {
-    const formData = new FormData();
+    // OAuth2PasswordRequestForm expects URL-encoded form data, not FormData
+    const formData = new URLSearchParams();
     formData.append('username', credentials.username);
     formData.append('password', credentials.password);
     
     const data: LoginResponse = await this.request<LoginResponse>('/auth/token', {
       method: 'POST',
-      body: formData,
+      body: formData.toString(),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
     });
     
     this.setToken(data.access_token);
