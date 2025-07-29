@@ -22,15 +22,20 @@ const Dashboard = () => {
   const navigate = useNavigate();
 
   // Fetch data
-  const { data: tasks = [], isLoading: tasksLoading, error: tasksError } = useCycleCountTasks();
+  const { data: tasksData = { items: [], total: 0 }, isLoading: tasksLoading, error: tasksError } = useCycleCountTasks();
+  const tasks = tasksData.items || [];
   const { data: assets = [], isLoading: assetsLoading, error: assetsError } = useAssets();
   const { data: locations = [], isLoading: locationsLoading, error: locationsError } = useLocations();
   const { data: categories = [], isLoading: categoriesLoading, error: categoriesError } = useCategories();
   const { data: assetCount = { count: 0 }, isLoading: assetCountLoading, error: assetCountError } = useAssetCount();
 
   // Get user role
-  const { data: userRoleData } = useUserRole(user?.id);
-  const userRole = userRoleData?.role;
+  const { data: userRole } = useUserRole();
+
+  // Debug logging for role
+  console.log('🔍 [Dashboard] User role data:', userRole);
+  console.log('🔍 [Dashboard] User role type:', typeof userRole);
+  console.log('🔍 [Dashboard] User role === admin:', userRole === 'admin');
 
   // Handle token from URL
   useEffect(() => {

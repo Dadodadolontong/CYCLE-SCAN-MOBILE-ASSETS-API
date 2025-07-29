@@ -32,34 +32,12 @@ export const useTempAssets = () => {
 export const useCreateTempAsset = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({
-      description,
-      model,
-      build,
-      location_id,
-      barcode,
-      cycle_count_task_id,
-    }: {
-      description: string;
-      model?: string;
-      build?: string;
-      location_id: string | null;
-      barcode: string;
-      cycle_count_task_id?: string | null;
-    }) => {
-      const payload: any = {
-        description,
-        model: model || null,
-        build: build || null,
-        location: location_id,
-        barcode,
-      };
-      if (cycle_count_task_id) payload.cycle_count_task_id = cycle_count_task_id;
-      const data = await fastapiClient.post<TempAsset>('/temp-assets', payload);
-      return { ...data, status: 'counted' as const };
+    mutationFn: async (payload: Omit<TempAsset, 'id' | 'created_at' | 'updated_at'>) => {
+      const data = await fastapiClient.post<TempAsset>('/temp-assets/', payload);
+      return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['temp_assets'] });
+      queryClient.invalidateQueries({ queryKey: ['temp-assets'] });
     },
   });
 };

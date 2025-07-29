@@ -84,11 +84,16 @@ export const useCreateCycleCountTask = () => {
   
   return useMutation({
     mutationFn: async (task: Omit<CycleCountTask, 'id' | 'created_at' | 'updated_at'>) => {
-      const data = await fastapiClient.post<CycleCountTask>('/cycle-count-tasks', task);
+      console.log('🔍 [useCreateCycleCountTask] Creating task with data:', task);
+      const data = await fastapiClient.post<CycleCountTask>('/cycle-count-tasks/', task);
+      console.log('🔍 [useCreateCycleCountTask] Task created successfully:', data);
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cycle_count_tasks'] });
+    },
+    onError: (error) => {
+      console.error('🔍 [useCreateCycleCountTask] Error creating task:', error);
     },
   });
 };
@@ -113,7 +118,7 @@ export const useCreateCycleCountItem = () => {
   
   return useMutation({
     mutationFn: async (item: Omit<CycleCountItem, 'id' | 'created_at' | 'updated_at'>) => {
-      const data = await fastapiClient.post<CycleCountItem>('/cycle-count-items', item);
+      const data = await fastapiClient.post<CycleCountItem>('/cycle-count-items/', item);
       return data;
     },
     onSuccess: (data) => {
