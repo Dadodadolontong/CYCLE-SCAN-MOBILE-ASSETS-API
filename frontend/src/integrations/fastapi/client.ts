@@ -40,7 +40,6 @@ class FastAPIClient {
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
-    
     const config: RequestInit = {
       ...options,
       headers: {
@@ -63,11 +62,26 @@ class FastAPIClient {
       };
     }
 
+    console.log('🔍 [FastAPIClient] Making request:', {
+      url,
+      method: config.method || 'GET',
+      hasToken: !!this.token,
+      headers: config.headers,
+      body: options.body
+    });
+
     try {
       const response = await fetch(url, config);
       
+      console.log('🔍 [FastAPIClient] Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
+      
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ detail: 'Request failed' }));
+        console.error('🔍 [FastAPIClient] Request failed:', errorData);
         throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
       }
 
@@ -77,8 +91,10 @@ class FastAPIClient {
       }
 
       const data = await response.json();
+      console.log('🔍 [FastAPIClient] Response data:', data);
       return data;
     } catch (error) {
+      console.error('🔍 [FastAPIClient] Request error:', error);
       if (error instanceof Error) {
         throw error;
       }

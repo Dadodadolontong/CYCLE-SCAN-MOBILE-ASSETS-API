@@ -32,22 +32,38 @@ export const useCycleCountTasks = (
   pageSize: number = 20,
   statusFilter: string = 'all'
 ) => {
+  console.log('🔍 [useCycleCountTasks] Hook called with:', { userRole, userId, page, pageSize, statusFilter, enabled: !!userId });
+  
   return useQuery({
     queryKey: ['cycle_count_tasks', userRole, userId, page, pageSize, statusFilter],
     queryFn: async () => {
+      console.log('🔍 [useCycleCountTasks] Starting API call, userId:', userId);
       if (!userId) {
+        console.log('🔍 [useCycleCountTasks] No userId, returning empty result');
         return { items: [], total: 0 };
       }
 
       const params = new URLSearchParams({
         skip: String((page - 1) * pageSize),
         limit: String(pageSize),
-        status: statusFilter
       });
+      
+      // Only add status filter if it's not 'all'
+      if (statusFilter && statusFilter !== 'all') {
+        params.append('status', statusFilter);
+      }
 
       const url = `/cycle-count-tasks?${params.toString()}`;
-      const data = await fastapiClient.get<{ items: CycleCountTask[]; total: number }>(url);
-      return data;
+      console.log('🔍 [useCycleCountTasks] Making API call to:', url);
+      
+      try {
+        const data = await fastapiClient.get<{ items: CycleCountTask[]; total: number }>(url);
+        console.log('🔍 [useCycleCountTasks] API call successful:', { itemsCount: data.items?.length || 0, total: data.total });
+        return data;
+      } catch (error) {
+        console.error('🔍 [useCycleCountTasks] API call failed:', error);
+        throw error;
+      }
     },
     enabled: !!userId,
   });

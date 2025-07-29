@@ -22,7 +22,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
 
   // Fetch data
-  const { data: tasksData = { items: [], total: 0 }, isLoading: tasksLoading, error: tasksError } = useCycleCountTasks();
+  const { data: tasksData = { items: [], total: 0 }, isLoading: tasksLoading, error: tasksError } = useCycleCountTasks(undefined, user?.id);
   const tasks = tasksData.items || [];
   const { data: assets = [], isLoading: assetsLoading, error: assetsError } = useAssets();
   const { data: locations = [], isLoading: locationsLoading, error: locationsError } = useLocations();
@@ -36,6 +36,13 @@ const Dashboard = () => {
   console.log('🔍 [Dashboard] User role data:', userRole);
   console.log('🔍 [Dashboard] User role type:', typeof userRole);
   console.log('🔍 [Dashboard] User role === admin:', userRole === 'admin');
+
+  // Debug logging for user and tasks
+  console.log('🔍 [Dashboard] User data:', user);
+  console.log('🔍 [Dashboard] User ID:', user?.id);
+  console.log('🔍 [Dashboard] Tasks data:', tasksData);
+  console.log('🔍 [Dashboard] Tasks loading:', tasksLoading);
+  console.log('🔍 [Dashboard] Tasks error:', tasksError);
 
   // Handle token from URL
   useEffect(() => {
