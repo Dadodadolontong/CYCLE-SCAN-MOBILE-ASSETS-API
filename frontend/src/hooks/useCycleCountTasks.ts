@@ -32,14 +32,10 @@ export const useCycleCountTasks = (
   pageSize: number = 20,
   statusFilter: string = 'all'
 ) => {
-  console.log('🔍 [useCycleCountTasks] Hook called with:', { userRole, userId, page, pageSize, statusFilter, enabled: !!userId });
-  
   return useQuery({
     queryKey: ['cycle_count_tasks', userRole, userId, page, pageSize, statusFilter],
     queryFn: async () => {
-      console.log('🔍 [useCycleCountTasks] Starting API call, userId:', userId);
       if (!userId) {
-        console.log('🔍 [useCycleCountTasks] No userId, returning empty result');
         return { items: [], total: 0 };
       }
 
@@ -54,16 +50,8 @@ export const useCycleCountTasks = (
       }
 
       const url = `/cycle-count-tasks?${params.toString()}`;
-      console.log('🔍 [useCycleCountTasks] Making API call to:', url);
-      
-      try {
-        const data = await fastapiClient.get<{ items: CycleCountTask[]; total: number }>(url);
-        console.log('🔍 [useCycleCountTasks] API call successful:', { itemsCount: data.items?.length || 0, total: data.total });
-        return data;
-      } catch (error) {
-        console.error('🔍 [useCycleCountTasks] API call failed:', error);
-        throw error;
-      }
+      const data = await fastapiClient.get<{ items: CycleCountTask[]; total: number }>(url);
+      return data;
     },
     enabled: !!userId,
   });
@@ -100,16 +88,11 @@ export const useCreateCycleCountTask = () => {
   
   return useMutation({
     mutationFn: async (task: Omit<CycleCountTask, 'id' | 'created_at' | 'updated_at'>) => {
-      console.log('🔍 [useCreateCycleCountTask] Creating task with data:', task);
       const data = await fastapiClient.post<CycleCountTask>('/cycle-count-tasks/', task);
-      console.log('🔍 [useCreateCycleCountTask] Task created successfully:', data);
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cycle_count_tasks'] });
-    },
-    onError: (error) => {
-      console.error('🔍 [useCreateCycleCountTask] Error creating task:', error);
     },
   });
 };

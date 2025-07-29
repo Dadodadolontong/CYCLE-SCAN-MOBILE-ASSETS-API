@@ -32,18 +32,6 @@ const Dashboard = () => {
   // Get user role
   const { data: userRole } = useUserRole();
 
-  // Debug logging for role
-  console.log('🔍 [Dashboard] User role data:', userRole);
-  console.log('🔍 [Dashboard] User role type:', typeof userRole);
-  console.log('🔍 [Dashboard] User role === admin:', userRole === 'admin');
-
-  // Debug logging for user and tasks
-  console.log('🔍 [Dashboard] User data:', user);
-  console.log('🔍 [Dashboard] User ID:', user?.id);
-  console.log('🔍 [Dashboard] Tasks data:', tasksData);
-  console.log('🔍 [Dashboard] Tasks loading:', tasksLoading);
-  console.log('🔍 [Dashboard] Tasks error:', tasksError);
-
   // Handle token from URL
   useEffect(() => {
     const params = new URLSearchParams(location.search);

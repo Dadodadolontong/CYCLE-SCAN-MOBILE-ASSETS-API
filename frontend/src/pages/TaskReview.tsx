@@ -48,30 +48,35 @@ const TaskReview = () => {
   // Calculate asset statuses based on count items and task scope
   const currentTaskLocation = task.location_filter || 'All locations';
   
+  // Ensure arrays are properly initialized
+  const safeAssets = assets || [];
+  const safeCountItems = countItems || [];
+  
   // Filter assets that were in scope for this task
-  let scopedAssets = assets;
+  let scopedAssets = safeAssets;
   if (task.location_filter) {
-    scopedAssets = assets.filter(asset => 
-      asset.location?.includes(task.location_filter!)
+    scopedAssets = safeAssets.filter(asset => 
+      asset && asset.location && asset.location.includes(task.location_filter!)
     );
   }
   
   // Get counted assets - those with count items having 'counted' status
-  const countedAssetIds = countItems
-    .filter(item => item.status === 'counted')
-    .map(item => item.asset_id);
+  const countedAssetIds = safeCountItems
+    .filter(item => item && item.status === 'counted')
+    .map(item => item.asset_id)
+    .filter(Boolean); // Remove any undefined asset_ids
   const countedAssets = scopedAssets
-    .filter(asset => countedAssetIds.includes(asset.id))
+    .filter(asset => asset && asset.id && countedAssetIds.includes(asset.id))
     .map(asset => ({ ...asset, status: 'counted' as const }));
   
   // Get missing assets - those in scope but not counted
   const missingAssets = scopedAssets
-    .filter(asset => !countedAssetIds.includes(asset.id))
+    .filter(asset => asset && asset.id && !countedAssetIds.includes(asset.id))
     .map(asset => ({ ...asset, status: 'pending' as const }));
     
   // Get temporary assets created during this task
-  const tempAssets = assets
-    .filter(a => a.category === 'Temporary' && a.location === currentTaskLocation)
+  const tempAssets = safeAssets
+    .filter(a => a && a.category === 'Temporary' && a.location === currentTaskLocation)
     .map(asset => ({ ...asset, status: 'counted' as const }));
 
   const totalItems = scopedAssets.length;
