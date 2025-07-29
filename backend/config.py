@@ -21,13 +21,21 @@ class Config:
 
     # CORS Configuration
     ALLOWED_ORIGINS: List[str] = os.getenv("ALLOWED_ORIGINS", "").split(",") if os.getenv("ALLOWED_ORIGINS") else []
+    
+    # Frontend Configuration
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:8080")
+    FRONTEND_HOST: str = os.getenv("FRONTEND_HOST", "localhost")
+    FRONTEND_PORT: int = int(os.getenv("FRONTEND_PORT", "8080"))
 
     # OAuth Configuration
-    OAUTH_CLIENT_ID: str = os.getenv("OAUTH_CLIENT_ID", "")
-    OAUTH_CLIENT_SECRET: str = os.getenv("OAUTH_CLIENT_SECRET", "")
-    OAUTH_AUTH_URL: str = os.getenv("OAUTH_AUTH_URL", "")
-    OAUTH_TOKEN_URL: str = os.getenv("OAUTH_TOKEN_URL", "")
-    OAUTH_USER_INFO_URL: str = os.getenv("OAUTH_USER_INFO_URL", "")
+    OAUTH_CLIENT_ID: str = os.getenv("OAUTH2_CLIENT_ID", "")
+    OAUTH_CLIENT_SECRET: str = os.getenv("OAUTH2_CLIENT_SECRET", "")
+    OAUTH_AUTH_URL: str = os.getenv("OAUTH2_AUTH_URL", "")
+    OAUTH_TOKEN_URL: str = os.getenv("OAUTH2_TOKEN_URL", "")
+    OAUTH_USER_INFO_URL: str = os.getenv("OAUTH2_USER_INFO_URL", "")
+    OAUTH_API_KEY: str = os.getenv("OAUTH2_API_KEY", "")
+    OAUTH_REDIRECT_URI: str = os.getenv("OAUTH2_REDIRECT_URI", "")
+    OAUTH_SCOPES: str = os.getenv("OAUTH2_SCOPES", "openid email profile")
 
     # Security
     SECRET_KEY: str = os.getenv("SECRET_KEY", "")

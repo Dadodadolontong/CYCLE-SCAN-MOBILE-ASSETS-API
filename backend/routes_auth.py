@@ -15,10 +15,6 @@ from auth import (
     get_user_roles,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
-from oauth import (
-    OAUTH2_CLIENT_ID, OAUTH2_CLIENT_SECRET, OAUTH2_AUTH_URL,
-    OAUTH2_TOKEN_URL, OAUTH2_USERINFO_URL, OAUTH2_SCOPES, OAUTH2_REDIRECT_URI, CUSTOM_LOAD,OAUTH2_API_KEY
-)
 import requests
 from rauth import OAuth2Service
 import rauth
@@ -26,16 +22,6 @@ import json
 from config import config
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
-
-# OAuth2 service configuration using config
-oauth_service = rauth.OAuth2Service(
-    client_id=config.OAUTH_CLIENT_ID,
-    client_secret=config.OAUTH_CLIENT_SECRET,
-    name="dexanpassport",
-    authorize_url=config.OAUTH_AUTH_URL,
-    access_token_url=config.OAUTH_TOKEN_URL,
-    base_url="https://dexanpassport.com"
-)
 
 def get_db():
     db = SessionLocal()
@@ -117,58 +103,78 @@ async def read_users_me(
 @router.get("/login")
 def login():
     state = str(uuid.uuid4())
-    service = OAuth2Service(
-        name="custom",
-        client_id=OAUTH2_CLIENT_ID,
-        client_secret=OAUTH2_CLIENT_SECRET,
-        authorize_url=OAUTH2_AUTH_URL,
-        access_token_url=OAUTH2_TOKEN_URL,
-        base_url=OAUTH2_USERINFO_URL  # Not always used, but required by rauth
-    )
+    
+    # Construct the authorization URL manually to ensure the API key is included
+    from urllib.parse import urlencode
+    
     params = {
-        "client_id": OAUTH2_CLIENT_ID,
-        "redirect_uri": OAUTH2_REDIRECT_URI,
-        "scope": OAUTH2_SCOPES,
+        "client_id": config.OAUTH_CLIENT_ID,
+        "redirect_uri": config.OAUTH_REDIRECT_URI,
+        "scope": config.OAUTH_SCOPES,
         "response_type": "code",
         "state": state,
-        "api-key": OAUTH2_API_KEY
+        "api-key": config.OAUTH_API_KEY
     }
-    authorize_url = service.get_authorize_url(**params)
+    
+    # Build the authorization URL with all parameters
+    authorize_url = f"{config.OAUTH_AUTH_URL}?{urlencode(params)}"
+    
+    print(f"OAuth2 Authorization URL: {authorize_url}")
+    print(f"OAuth2 API Key: {config.OAUTH_API_KEY}")
+    
     return RedirectResponse(authorize_url)
 
 @router.get("/callback")
 def callback(code: str = Query(...), state: str = Query(None)):
-    print("OAuth2 state received:", state)
+    print("OAuth2 callback received:")
+    print(f"  Code: {code[:10]}..." if code else "No code")
+    print(f"  State: {state}")
+    print(f"  Token URL: {config.OAUTH_TOKEN_URL}")
+    print(f"  API Key: {config.OAUTH_API_KEY}")
+    
     service = OAuth2Service(
         name="custom",
-        client_id=OAUTH2_CLIENT_ID,
-        client_secret=OAUTH2_CLIENT_SECRET,
-        authorize_url=OAUTH2_AUTH_URL,
-        access_token_url=OAUTH2_TOKEN_URL,
-        base_url=OAUTH2_USERINFO_URL
+        client_id=config.OAUTH_CLIENT_ID,
+        client_secret=config.OAUTH_CLIENT_SECRET,
+        authorize_url=config.OAUTH_AUTH_URL,
+        access_token_url=config.OAUTH_TOKEN_URL,
+        base_url=config.OAUTH_USER_INFO_URL
     )
     data = {
         "grant_type": "authorization_code",
         "code": code,
-        "redirect_uri": OAUTH2_REDIRECT_URI,
-        "client_id": OAUTH2_CLIENT_ID,
-        "client_secret": OAUTH2_CLIENT_SECRET
+        "redirect_uri": config.OAUTH_REDIRECT_URI,
+        "client_id": config.OAUTH_CLIENT_ID,
+        "client_secret": config.OAUTH_CLIENT_SECRET
     }
     headers = {}
+    
+    print(f"Token exchange data: {data}")
     
     session = service.get_auth_session(
         data=data,
         decoder=lambda b: json.loads(b.decode()),
         headers=headers
     )
+    
+    print(f"Token exchange successful, access token: {session.access_token[:20]}..." if session.access_token else "No access token")
+    
     # Fetch user info
     userinfo_headers = {"Authorization": f"Bearer {session.access_token}"}
-    params = {"api-key": OAUTH2_API_KEY}
+    params = {"api-key": config.OAUTH_API_KEY}
     
-    userinfo_resp = session.get(OAUTH2_USERINFO_URL, headers=userinfo_headers, params=params)
+    print(f"Fetching user info from: {config.OAUTH_USER_INFO_URL}")
+    print(f"User info headers: {userinfo_headers}")
+    print(f"User info params: {params}")
+    
+    userinfo_resp = session.get(config.OAUTH_USER_INFO_URL, headers=userinfo_headers, params=params)
     if not userinfo_resp.ok:
+        print(f"User info request failed: {userinfo_resp.status_code} - {userinfo_resp.text}")
         raise HTTPException(status_code=400, detail="Failed to fetch user info")
+    
     userinfo = userinfo_resp.json()
+    print(f"User info received: {userinfo}")
+    
     email = userinfo.get("email")
     if not email:
         raise HTTPException(status_code=400, detail="No email in user info")
@@ -185,12 +191,12 @@ def callback(code: str = Query(...), state: str = Query(None)):
                 )
                 # Redirect to frontend dashboard with token
                 return RedirectResponse(
-                    url=f"http://localhost:8080/dashboard?token={access_token}"
+                    url=f"{config.FRONTEND_URL}/dashboard?token={access_token}"
                 )
             else:
                 # User is not active (locked or pending review)
                 return RedirectResponse(
-                    url="http://localhost:8080/auth?message=Your account is pending review by an administrator."
+                    url=f"{config.FRONTEND_URL}/auth?message=Your account is pending review by an administrator."
                 )
         else:
             import uuid
@@ -206,7 +212,7 @@ def callback(code: str = Query(...), state: str = Query(None)):
             db.add(UserRole(user_id=user_id, role="guest"))
             db.commit()
             return RedirectResponse(
-                url="http://localhost:8080/auth?message=Your account is pending review by an administrator."
+                url=f"{config.FRONTEND_URL}/auth?message=Your account is pending review by an administrator."
             )
     finally:    
         db.close() 
