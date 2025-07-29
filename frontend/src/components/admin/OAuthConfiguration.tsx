@@ -4,17 +4,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Shield, Edit, Trash2 } from 'lucide-react';
+import { Shield, Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
+import { fastapiClient } from '@/integrations/fastapi/client';
 
 interface OAuthProvider {
   id: string;
   name: string;
   client_id: string;
+  client_secret: string;
   auth_url: string;
   token_url: string;
   user_info_url: string;
@@ -26,11 +29,13 @@ interface OAuthProvider {
 export const OAuthConfiguration = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingProvider, setEditingProvider] = useState<OAuthProvider | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     client_id: '',
+    client_secret: '',
     auth_url: '',
     token_url: '',
     user_info_url: '',
@@ -38,55 +43,40 @@ export const OAuthConfiguration = () => {
     is_active: true
   });
 
-  const { data: providers, isLoading } = useQuery({
+  const { data: providers = [], isLoading } = useQuery({
     queryKey: ['oauth-providers'],
     queryFn: async () => {
-      const response = await fetch('/api/oauth-providers');
-      if (!response.ok) {
-        throw new Error('Failed to fetch OAuth providers');
-      }
-      return response.json() as Promise<OAuthProvider[]>;
+      const data = await fastapiClient.get<OAuthProvider[]>('/oauth-providers');
+      return data;
     }
   });
 
   const createProviderMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
-      const response = await fetch('/api/oauth-providers', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create OAuth provider');
-      }
-
-      await fetch('/api/log-admin-action', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          _action: 'create_oauth_provider',
-          _resource_type: 'oauth_provider',
-          _details: { provider_name: data.name }
-        }),
-      });
+    mutationFn: async (providerData: any) => {
+      const data = await fastapiClient.post('/oauth-providers', providerData);
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['oauth-providers'] });
-      setIsDialogOpen(false);
-      resetForm();
+      setIsCreateDialogOpen(false);
+      setFormData({
+        name: '',
+        client_id: '',
+        client_secret: '',
+        auth_url: '',
+        token_url: '',
+        user_info_url: '',
+        scopes: '',
+        is_active: true
+      });
       toast({
-        title: 'Success',
-        description: 'OAuth provider created successfully',
+        title: 'Provider Created',
+        description: 'OAuth provider has been created successfully',
       });
     },
-    onError: () => {
+    onError: (error) => {
       toast({
-        title: 'Error',
+        title: 'Creation Failed',
         description: 'Failed to create OAuth provider',
         variant: 'destructive',
       });
@@ -94,45 +84,22 @@ export const OAuthConfiguration = () => {
   });
 
   const updateProviderMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: typeof formData }) => {
-      const response = await fetch(`/api/oauth-providers/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update OAuth provider');
-      }
-
-      await fetch('/api/log-admin-action', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          _action: 'update_oauth_provider',
-          _resource_type: 'oauth_provider',
-          _resource_id: id,
-          _details: { provider_name: data.name }
-        }),
-      });
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const response = await fastapiClient.put(`/oauth-providers/${id}`, data);
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['oauth-providers'] });
-      setIsDialogOpen(false);
+      setIsEditDialogOpen(false);
       setEditingProvider(null);
-      resetForm();
       toast({
-        title: 'Success',
-        description: 'OAuth provider updated successfully',
+        title: 'Provider Updated',
+        description: 'OAuth provider has been updated successfully',
       });
     },
-    onError: () => {
+    onError: (error) => {
       toast({
-        title: 'Error',
+        title: 'Update Failed',
         description: 'Failed to update OAuth provider',
         variant: 'destructive',
       });
@@ -141,66 +108,37 @@ export const OAuthConfiguration = () => {
 
   const deleteProviderMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetch(`/api/oauth-providers/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete OAuth provider');
-      }
-
-      await fetch('/api/log-admin-action', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          _action: 'delete_oauth_provider',
-          _resource_type: 'oauth_provider',
-          _resource_id: id
-        }),
-      });
+      await fastapiClient.delete(`/oauth-providers/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['oauth-providers'] });
       toast({
-        title: 'Success',
-        description: 'OAuth provider deleted successfully',
+        title: 'Provider Deleted',
+        description: 'OAuth provider has been deleted successfully',
       });
     },
-    onError: () => {
+    onError: (error) => {
       toast({
-        title: 'Error',
+        title: 'Deletion Failed',
         description: 'Failed to delete OAuth provider',
         variant: 'destructive',
       });
     }
   });
 
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      client_id: '',
-      auth_url: '',
-      token_url: '',
-      user_info_url: '',
-      scopes: '',
-      is_active: true
-    });
-  };
-
   const handleEdit = (provider: OAuthProvider) => {
     setEditingProvider(provider);
     setFormData({
       name: provider.name,
       client_id: provider.client_id,
+      client_secret: provider.client_secret,
       auth_url: provider.auth_url,
       token_url: provider.token_url,
       user_info_url: provider.user_info_url,
       scopes: provider.scopes.join(', '),
       is_active: provider.is_active
     });
-    setIsDialogOpen(true);
+    setIsEditDialogOpen(true);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -219,9 +157,9 @@ export const OAuthConfiguration = () => {
           <h2 className="text-3xl font-bold text-foreground">OAuth Configuration</h2>
           <p className="text-muted-foreground">Manage custom OAuth2 authentication providers</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={() => { resetForm(); setEditingProvider(null); }}>
+            <Button onClick={() => { setFormData({ name: '', client_id: '', client_secret: '', auth_url: '', token_url: '', user_info_url: '', scopes: '', is_active: true }); setEditingProvider(null); }}>
               <Plus className="h-4 w-4 mr-2" />
               Add Provider
             </Button>
@@ -253,6 +191,16 @@ export const OAuthConfiguration = () => {
                   value={formData.client_id}
                   onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
                   required
+                />
+              </div>
+              <div>
+                <Label htmlFor="client_secret">Client Secret</Label>
+                <Input
+                  id="client_secret"
+                  type="password"
+                  value={formData.client_secret}
+                  onChange={(e) => setFormData({ ...formData, client_secret: e.target.value })}
+                  placeholder="Leave empty to generate"
                 />
               </div>
               <div>
@@ -327,7 +275,7 @@ export const OAuthConfiguration = () => {
             <div className="flex items-center justify-center p-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
-          ) : providers?.length === 0 ? (
+          ) : providers.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <Shield className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>No OAuth providers configured</p>
@@ -345,7 +293,7 @@ export const OAuthConfiguration = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {providers?.map((provider) => (
+                {providers.map((provider) => (
                   <TableRow key={provider.id}>
                     <TableCell>
                       <div>
