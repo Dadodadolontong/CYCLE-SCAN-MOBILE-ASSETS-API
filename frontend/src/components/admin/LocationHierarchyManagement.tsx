@@ -159,7 +159,7 @@ export const LocationHierarchyManagement = () => {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Code</TableHead>
-                    <TableHead>Accounting Manager</TableHead>
+                    <TableHead>Assigned Users</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -171,7 +171,20 @@ export const LocationHierarchyManagement = () => {
                         <Badge variant="outline">{country.code}</Badge>
                       </TableCell>
                       <TableCell>
-                        Unassigned
+                        {country.assigned_users && country.assigned_users.length > 0 ? (
+                          <div className="space-y-1">
+                            {country.assigned_users.map((user) => (
+                              <div key={user.assignment_id} className="flex items-center gap-2 text-sm">
+                                <Badge variant="secondary" className="text-xs">
+                                  {user.role.replace('_', ' ')}
+                                </Badge>
+                                <span>{user.display_name || 'Unknown User'}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">No users assigned</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -307,7 +320,7 @@ export const LocationHierarchyManagement = () => {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Country</TableHead>
-                    <TableHead>Controller</TableHead>
+                    <TableHead>Assigned Users</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -317,7 +330,20 @@ export const LocationHierarchyManagement = () => {
                       <TableCell className="font-medium">{region.name}</TableCell>
                       <TableCell>{region.country?.name}</TableCell>
                       <TableCell>
-                        Unassigned
+                        {region.assigned_users && region.assigned_users.length > 0 ? (
+                          <div className="space-y-1">
+                            {region.assigned_users.map((user) => (
+                              <div key={user.assignment_id} className="flex items-center gap-2 text-sm">
+                                <Badge variant="secondary" className="text-xs">
+                                  {user.role.replace('_', ' ')}
+                                </Badge>
+                                <span>{user.display_name || 'Unknown User'}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">No users assigned</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -409,7 +435,7 @@ export const LocationHierarchyManagement = () => {
                     <TableHead>Name</TableHead>
                     <TableHead>Region</TableHead>
                     <TableHead>Country</TableHead>
-                    <TableHead>Manager</TableHead>
+                    <TableHead>Assigned Users</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -420,7 +446,20 @@ export const LocationHierarchyManagement = () => {
                       <TableCell>{branch.region?.name}</TableCell>
                       <TableCell>{branch.country?.name}</TableCell>
                       <TableCell>
-                        Unassigned
+                        {branch.assigned_users && branch.assigned_users.length > 0 ? (
+                          <div className="space-y-1">
+                            {branch.assigned_users.map((user) => (
+                              <div key={user.assignment_id} className="flex items-center gap-2 text-sm">
+                                <Badge variant="secondary" className="text-xs">
+                                  {user.role.replace('_', ' ')}
+                                </Badge>
+                                <span>{user.display_name || 'Unknown User'}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">No users assigned</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">

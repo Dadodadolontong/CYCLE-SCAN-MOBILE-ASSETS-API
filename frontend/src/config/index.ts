@@ -7,44 +7,35 @@ interface Config {
   frontend: {
     url: string;
     port: number;
+    host: string;
+    allowedHosts?: string[];
   };
-  oauth: {
-    clientId: string;
-    redirectUri: string;
+  auth: {
+    tokenKey: string;
+    sessionKey: string;
   };
-  environment: string;
   features: {
-    debug: boolean;
-    analytics: boolean;
+    enableDebugMode: boolean;
+    enableAnalytics: boolean;
   };
 }
 
-// Check if we're in development mode
 const isDevMode = import.meta.env.DEV;
 
-console.log("🔍 [Config] Environment variables:", {
-  VITE_API_URL: import.meta.env.VITE_API_URL,
-  VITE_FRONTEND_URL: import.meta.env.VITE_FRONTEND_URL,
-  VITE_FRONTEND_PORT: import.meta.env.VITE_FRONTEND_PORT,
-  isDevMode
-});
-
-// Validate required environment variables only in production
+// Validate required environment variables in production
 if (!isDevMode) {
   const requiredEnvVars = [
     'VITE_API_URL',
     'VITE_FRONTEND_URL',
     'VITE_FRONTEND_PORT'
-  ] as const;
-
-  for (const envVar of requiredEnvVars) {
-    if (!import.meta.env[envVar]) {
-      throw new Error(`Missing required environment variable: ${envVar}`);
-    }
+  ];
+  
+  const missingVars = requiredEnvVars.filter(varName => !import.meta.env[varName]);
+  if (missingVars.length > 0) {
+    throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
   }
 }
 
-// Configuration object with fallbacks for development
 export const config: Config = {
   api: {
     url: import.meta.env.VITE_API_URL || (isDevMode ? 'http://localhost:8002' : ''),
@@ -53,24 +44,20 @@ export const config: Config = {
   frontend: {
     url: import.meta.env.VITE_FRONTEND_URL || (isDevMode ? 'http://localhost:8080' : ''),
     port: parseInt(import.meta.env.VITE_FRONTEND_PORT || (isDevMode ? '8080' : '3000')),
+    host: import.meta.env.VITE_FRONTEND_HOST || (isDevMode ? 'dev-frontend.local' : 'localhost'),
+    allowedHosts: import.meta.env.VITE_ALLOWED_HOSTS ? 
+      import.meta.env.VITE_ALLOWED_HOSTS.split(',').map(h => h.trim()).filter(Boolean) : 
+      undefined,
   },
-  oauth: {
-    clientId: import.meta.env.VITE_OAUTH_CLIENT_ID || '',
-    redirectUri: import.meta.env.VITE_OAUTH_REDIRECT_URI || '',
+  auth: {
+    tokenKey: import.meta.env.VITE_AUTH_TOKEN_KEY || 'fastapi_token',
+    sessionKey: import.meta.env.VITE_AUTH_SESSION_KEY || 'fastapi_session',
   },
-  environment: import.meta.env.VITE_NODE_ENV || 'development',
   features: {
-    debug: import.meta.env.VITE_ENABLE_DEBUG === 'true',
-    analytics: import.meta.env.VITE_ENABLE_ANALYTICS === 'true',
+    enableDebugMode: import.meta.env.VITE_ENABLE_DEBUG_MODE === 'true',
+    enableAnalytics: import.meta.env.VITE_ENABLE_ANALYTICS === 'true',
   },
 };
-
-console.log("🔍 [Config] Final config values:", {
-  apiUrl: config.api.url,
-  frontendUrl: config.frontend.url,
-  frontendPort: config.frontend.port,
-  environment: config.environment
-});
 
 // Helper functions
 export const getApiUrl = (endpoint: string = ''): string => {
@@ -85,7 +72,7 @@ export const getFrontendUrl = (path: string = ''): string => {
   return cleanPath ? `${baseUrl}/${cleanPath}` : baseUrl;
 };
 
-export const isDevelopment = (): boolean => config.environment === 'development';
-export const isProduction = (): boolean => config.environment === 'production';
+export const isDevelopment = (): boolean => import.meta.env.DEV;
+export const isProduction = (): boolean => !import.meta.env.DEV;
 
 export default config; 

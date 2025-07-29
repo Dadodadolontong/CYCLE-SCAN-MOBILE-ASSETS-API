@@ -15,24 +15,11 @@ export interface Asset {
 }
 
 export const useAssets = () => {
-  console.log("🔍 [useAssets] Hook called");
-  
   return useQuery({
     queryKey: ['assets'],
     queryFn: async () => {
-      console.log("🔍 [useAssets] Starting API call to /assets");
-      try {
-        const data = await fastapiClient.get<Asset[]>('/assets');
-        console.log("🔍 [useAssets] API call successful, assets count:", data?.length || 0);
-        
-        // Transform database assets to include cycle count status
-        return data.map(asset => ({
-          ...asset
-        })) as Asset[];
-      } catch (error) {
-        console.error("🔍 [useAssets] API call failed:", error);
-        throw error;
-      }
+      const data = await fastapiClient.get<Asset[]>('/assets');
+      return data.map(asset => ({ ...asset }));
     },
   });
 };
@@ -64,20 +51,11 @@ export const useUpdateAssetStatus = () => {
 };
 
 export const useAssetCount = () => {
-  console.log("🔍 [useAssetCount] Hook called");
-  
   return useQuery({
     queryKey: ['asset-count'],
     queryFn: async () => {
-      console.log("🔍 [useAssetCount] Starting API call to /assets/count");
-      try {
-        const data = await fastapiClient.get<{ count: number }>('/assets/count');
-        console.log("🔍 [useAssetCount] API call successful, count:", data.count);
-        return data.count;
-      } catch (error) {
-        console.error("🔍 [useAssetCount] API call failed:", error);
-        throw error;
-      }
+      const data = await fastapiClient.get<{ count: number }>('/assets/count');
+      return data;
     },
   });
 };

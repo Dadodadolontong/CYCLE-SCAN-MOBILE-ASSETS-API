@@ -38,84 +38,40 @@ class FastAPIClient {
     this.token = localStorage.getItem('auth_token');
   }
 
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
     
-    console.log("🔍 [FastAPIClient] Making request:", {
-      method: options.method || 'GET',
-      url,
-      baseURL: this.baseURL,
-      endpoint,
-      hasToken: !!this.token
-    });
-    
-    const headers: Record<string, string> = {};
-
-    // Add default Content-Type if not provided and not FormData
-    if (!options.headers && !(options.body instanceof FormData)) {
-      headers['Content-Type'] = 'application/json';
-    }
-
-    // Add authorization header if token exists
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
-    }
-
-    // Merge with provided headers
-    const finalHeaders = {
-      ...headers,
-      ...(options.headers as Record<string, string> || {}),
-    };
-
     const config: RequestInit = {
       ...options,
-      headers: finalHeaders,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
     };
 
+    if (this.token) {
+      config.headers = {
+        ...config.headers,
+        'Authorization': `Bearer ${this.token}`,
+      };
+    }
+
     try {
-      console.log("🔍 [FastAPIClient] Sending request to:", url);
       const response = await fetch(url, config);
-      console.log("🔍 [FastAPIClient] Response received:", {
-        status: response.status,
-        statusText: response.statusText,
-        url: response.url
-      });
       
-      if (response.status === 401) {
-        console.error("🔍 [FastAPIClient] 401 Unauthorized - redirecting to login");
-        // Force logout on unauthorized
-        this.clearToken();
-        window.location.href = '/auth';
-        throw new Error('Session expired. Please log in again.');
-      }
-
       if (!response.ok) {
-        console.error("🔍 [FastAPIClient] Request failed:", {
-          status: response.status,
-          statusText: response.statusText
-        });
-        const errorData: ApiError = await response.json().catch(() => ({ detail: 'Unknown error' }));
-        throw new Error(errorData.detail || `HTTP ${response.status}`);
+        const errorData = await response.json().catch(() => ({ detail: 'Request failed' }));
+        throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
       }
 
-      // Handle empty responses
+      // Handle empty responses (204 No Content)
       if (response.status === 204) {
-        console.log("🔍 [FastAPIClient] Empty response (204)");
         return {} as T;
       }
 
       const data = await response.json();
-      console.log("🔍 [FastAPIClient] Request successful:", {
-        dataType: typeof data,
-        isArray: Array.isArray(data),
-        dataLength: Array.isArray(data) ? data.length : 'N/A'
-      });
       return data;
     } catch (error) {
-      console.error("🔍 [FastAPIClient] Request error:", error);
       if (error instanceof Error) {
         throw error;
       }
@@ -200,12 +156,10 @@ class FastAPIClient {
   }
 }
 
-// Create and export the client instance
+// Lazy initialization of client instance
 let _fastapiClient: FastAPIClient | null = null;
-
 export const fastapiClient = (() => {
   if (!_fastapiClient) {
-    console.log("🔍 [FastAPIClient] Initializing with API URL:", config.api.url);
     _fastapiClient = new FastAPIClient(config.api.url);
   }
   return _fastapiClient;

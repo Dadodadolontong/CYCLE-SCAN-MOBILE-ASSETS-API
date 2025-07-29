@@ -1,12 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fastapiClient } from '@/integrations/fastapi/client';
+import { Country } from './useCountries';
 
-export interface Country {
-  id: string;
-  name: string;
-  code: string;
-  created_at: string;
-  updated_at: string;
+export interface AssignedUser {
+  user_id: string;
+  role: string;
+  display_name: string | null;
+  assignment_id: string;
 }
 
 export interface Region {
@@ -24,6 +24,7 @@ export interface Branch {
   region_id: string;
   region?: Region;
   country?: Country;
+  assigned_users: AssignedUser[];
   created_at: string;
   updated_at: string;
 }

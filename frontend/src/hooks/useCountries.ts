@@ -1,10 +1,19 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fastapiClient } from '@/integrations/fastapi/client';
 
+export interface AssignedUser {
+  user_id: string;
+  role: string;
+  display_name: string | null;
+  assignment_id: string;
+}
+
 export interface Country {
   id: string;
   name: string;
   code: string;
+  accounting_manager_id?: string;
+  assigned_users: AssignedUser[];
   created_at: string;
   updated_at: string;
 }

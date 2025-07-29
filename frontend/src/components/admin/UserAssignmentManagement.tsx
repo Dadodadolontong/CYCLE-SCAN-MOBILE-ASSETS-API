@@ -42,15 +42,6 @@ export const UserAssignmentManagement = () => {
   const { data: regionAssignments, isLoading: regionAssignmentsLoading } = useAllRegionAssignments();
   const { data: branchAssignments, isLoading: branchAssignmentsLoading } = useAllBranchAssignments();
 
-  // Debug logging
-  console.log('🔍 [UserAssignmentManagement] Users:', users);
-  console.log('🔍 [UserAssignmentManagement] Countries:', countries);
-  console.log('🔍 [UserAssignmentManagement] Regions:', regions);
-  console.log('🔍 [UserAssignmentManagement] Branches:', branches);
-  console.log('🔍 [UserAssignmentManagement] Country Assignments:', countryAssignments);
-  console.log('🔍 [UserAssignmentManagement] Region Assignments:', regionAssignments);
-  console.log('🔍 [UserAssignmentManagement] Branch Assignments:', branchAssignments);
-
   // Mutations
   const assignUserToCountryMutation = useAssignUserToCountry();
   const assignUserToRegionMutation = useAssignUserToRegion();

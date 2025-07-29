@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException
 from typing import List, Dict, Any, Optional
-from models import Country, Region, Branch
+from models import Country, Region, Branch, UserCountryAssignment, UserRegionAssignment, UserBranchAssignment, UserRole, Profile
 import uuid
 from utils import get_access_scope_for_user
 
@@ -16,29 +16,40 @@ class LocationService:
             scope = get_access_scope_for_user(self.db, user_id)
             if not scope['is_admin']:
                 allowed_ids = set(scope['country_ids'])
-                return [
-                    {
-                        'id': c.id,
-                        'name': c.name,
-                        'code': c.code,
-                        'accounting_manager_id': c.accounting_manager_id,
-                        'created_at': c.created_at,
-                        'updated_at': c.updated_at,
-                    }
-                    for c in self.db.query(Country).filter(Country.id.in_(allowed_ids)).order_by(Country.name).all()
-                ]
-        # Default: return all
-        return [
-            {
-                'id': c.id,
-                'name': c.name,
-                'code': c.code,
-                'accounting_manager_id': c.accounting_manager_id,
-                'created_at': c.created_at,
-                'updated_at': c.updated_at,
-            }
-            for c in self.db.query(Country).order_by(Country.name).all()
-        ]
+                countries = self.db.query(Country).filter(Country.id.in_(allowed_ids)).order_by(Country.name).all()
+            else:
+                countries = self.db.query(Country).order_by(Country.name).all()
+        else:
+            countries = self.db.query(Country).order_by(Country.name).all()
+        
+        result = []
+        for country in countries:
+            # Get assigned users for this country
+            assignments = self.db.query(UserCountryAssignment).filter(UserCountryAssignment.country_id == country.id).all()
+            assigned_users = []
+            
+            for assignment in assignments:
+                user_role = self.db.query(UserRole).filter(UserRole.user_id == assignment.user_id).first()
+                profile = self.db.query(Profile).filter(Profile.id == assignment.user_id).first()
+                if user_role and profile:
+                    assigned_users.append({
+                        'user_id': assignment.user_id,
+                        'role': user_role.role,
+                        'display_name': profile.display_name,
+                        'assignment_id': assignment.id
+                    })
+            
+            result.append({
+                'id': country.id,
+                'name': country.name,
+                'code': country.code,
+                'accounting_manager_id': country.accounting_manager_id,
+                'assigned_users': assigned_users,
+                'created_at': country.created_at,
+                'updated_at': country.updated_at,
+            })
+        
+        return result
 
     def create_country(self, name: str, code: str) -> Dict[str, Any]:
         if self.db.query(Country).filter(Country.code == code).first():
@@ -101,21 +112,41 @@ class LocationService:
             if not scope['is_admin']:
                 allowed_ids = set(scope['region_ids'])
                 q = q.filter(Region.id.in_(allowed_ids))
-        return [
-            {
-                'id': r.id,
-                'name': r.name,
-                'country_id': r.country_id,
+        
+        regions = q.order_by(Region.name).all()
+        result = []
+        
+        for region in regions:
+            # Get assigned users for this region
+            assignments = self.db.query(UserRegionAssignment).filter(UserRegionAssignment.region_id == region.id).all()
+            assigned_users = []
+            
+            for assignment in assignments:
+                user_role = self.db.query(UserRole).filter(UserRole.user_id == assignment.user_id).first()
+                profile = self.db.query(Profile).filter(Profile.id == assignment.user_id).first()
+                if user_role and profile:
+                    assigned_users.append({
+                        'user_id': assignment.user_id,
+                        'role': user_role.role,
+                        'display_name': profile.display_name,
+                        'assignment_id': assignment.id
+                    })
+            
+            result.append({
+                'id': region.id,
+                'name': region.name,
+                'country_id': region.country_id,
                 'country': {
-                    'id': r.country.id,
-                    'name': r.country.name,
-                    'code': r.country.code,
+                    'id': region.country.id,
+                    'name': region.country.name,
+                    'code': region.country.code,
                 },
-                'created_at': r.created_at,
-                'updated_at': r.updated_at,
-            }
-            for r in q.order_by(Region.name).all()
-        ]
+                'assigned_users': assigned_users,
+                'created_at': region.created_at,
+                'updated_at': region.updated_at,
+            })
+        
+        return result
 
     def create_region(self, name: str, country_id: str) -> Dict[str, Any]:
         region = Region(name=name, country_id=country_id)
@@ -190,25 +221,45 @@ class LocationService:
             if not scope['is_admin']:
                 allowed_ids = set(scope['branch_ids'])
                 q = q.filter(Branch.id.in_(allowed_ids))
-        return [
-            {
-                'id': b.id,
-                'name': b.name,
-                'region_id': b.region_id,
+        
+        branches = q.order_by(Branch.name).all()
+        result = []
+        
+        for branch in branches:
+            # Get assigned users for this branch
+            assignments = self.db.query(UserBranchAssignment).filter(UserBranchAssignment.branch_id == branch.id).all()
+            assigned_users = []
+            
+            for assignment in assignments:
+                user_role = self.db.query(UserRole).filter(UserRole.user_id == assignment.user_id).first()
+                profile = self.db.query(Profile).filter(Profile.id == assignment.user_id).first()
+                if user_role and profile:
+                    assigned_users.append({
+                        'user_id': assignment.user_id,
+                        'role': user_role.role,
+                        'display_name': profile.display_name,
+                        'assignment_id': assignment.id
+                    })
+            
+            result.append({
+                'id': branch.id,
+                'name': branch.name,
+                'region_id': branch.region_id,
                 'region': {
-                    'id': b.region.id,
-                    'name': b.region.name,
+                    'id': branch.region.id,
+                    'name': branch.region.name,
                 },
                 'country': {
-                    'id': b.region.country.id,
-                    'name': b.region.country.name,
-                    'code': b.region.country.code,
+                    'id': branch.region.country.id,
+                    'name': branch.region.country.name,
+                    'code': branch.region.country.code,
                 },
-                'created_at': b.created_at,
-                'updated_at': b.updated_at,
-            }
-            for b in q.order_by(Branch.name).all()
-        ]
+                'assigned_users': assigned_users,
+                'created_at': branch.created_at,
+                'updated_at': branch.updated_at,
+            })
+        
+        return result
 
     def create_branch(self, name: str, region_id: str) -> Dict[str, Any]:
         branch = Branch(name=name, region_id=region_id)
