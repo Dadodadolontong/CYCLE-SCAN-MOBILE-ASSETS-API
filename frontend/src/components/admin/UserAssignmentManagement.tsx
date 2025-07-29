@@ -38,9 +38,18 @@ export const UserAssignmentManagement = () => {
   const { data: branches } = useBranches();
 
   // Fetch current assignments
-  const { data: countryAssignments } = useAllCountryAssignments();
-  const { data: regionAssignments } = useAllRegionAssignments();
-  const { data: branchAssignments } = useAllBranchAssignments();
+  const { data: countryAssignments, isLoading: countryAssignmentsLoading } = useAllCountryAssignments();
+  const { data: regionAssignments, isLoading: regionAssignmentsLoading } = useAllRegionAssignments();
+  const { data: branchAssignments, isLoading: branchAssignmentsLoading } = useAllBranchAssignments();
+
+  // Debug logging
+  console.log('🔍 [UserAssignmentManagement] Users:', users);
+  console.log('🔍 [UserAssignmentManagement] Countries:', countries);
+  console.log('🔍 [UserAssignmentManagement] Regions:', regions);
+  console.log('🔍 [UserAssignmentManagement] Branches:', branches);
+  console.log('🔍 [UserAssignmentManagement] Country Assignments:', countryAssignments);
+  console.log('🔍 [UserAssignmentManagement] Region Assignments:', regionAssignments);
+  console.log('🔍 [UserAssignmentManagement] Branch Assignments:', branchAssignments);
 
   // Mutations
   const assignUserToCountryMutation = useAssignUserToCountry();
@@ -190,30 +199,46 @@ export const UserAssignmentManagement = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {countryAssignments?.map((assignment) => (
-                    <TableRow key={assignment.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {getRoleIcon(assignment.user_role?.role || '')}
-                          {assignment.user_role?.display_name || 'Unknown User'}
-                        </div>
-                      </TableCell>
-                      <TableCell>{assignment.country?.name}</TableCell>
-                      <TableCell>
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          onClick={() => removeUserAssignmentMutation.mutate({ 
-                            type: 'country', 
-                            assignmentId: assignment.id 
-                          })}
-                          disabled={removeUserAssignmentMutation.isPending}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                  {countryAssignmentsLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center py-4">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
+                        <p className="text-sm text-muted-foreground mt-2">Loading assignments...</p>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : countryAssignments && countryAssignments.length > 0 ? (
+                    countryAssignments.map((assignment) => (
+                      <TableRow key={assignment.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {getRoleIcon(assignment.user_role?.role || '')}
+                            {assignment.user_role?.display_name || 'Unknown User'}
+                          </div>
+                        </TableCell>
+                        <TableCell>{assignment.country?.name}</TableCell>
+                        <TableCell>
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            onClick={() => removeUserAssignmentMutation.mutate({ 
+                              type: 'country', 
+                              assignmentId: assignment.id 
+                            })}
+                            disabled={removeUserAssignmentMutation.isPending}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center py-8">
+                        <p className="text-muted-foreground">No country assignments found</p>
+                        <p className="text-sm text-muted-foreground">Assign accounting managers to countries using the form above</p>
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -277,31 +302,47 @@ export const UserAssignmentManagement = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {regionAssignments?.map((assignment) => (
-                    <TableRow key={assignment.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {getRoleIcon(assignment.user_role?.role || '')}
-                          {assignment.user_role?.display_name || 'Unknown User'}
-                        </div>
-                      </TableCell>
-                      <TableCell>{assignment.region?.name}</TableCell>
-                      <TableCell>{assignment.region?.country?.name}</TableCell>
-                      <TableCell>
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          onClick={() => removeUserAssignmentMutation.mutate({ 
-                            type: 'region', 
-                            assignmentId: assignment.id 
-                          })}
-                          disabled={removeUserAssignmentMutation.isPending}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                  {regionAssignmentsLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-4">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
+                        <p className="text-sm text-muted-foreground mt-2">Loading assignments...</p>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : regionAssignments && regionAssignments.length > 0 ? (
+                    regionAssignments.map((assignment) => (
+                      <TableRow key={assignment.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {getRoleIcon(assignment.user_role?.role || '')}
+                            {assignment.user_role?.display_name || 'Unknown User'}
+                          </div>
+                        </TableCell>
+                        <TableCell>{assignment.region?.name}</TableCell>
+                        <TableCell>{assignment.region?.country?.name}</TableCell>
+                        <TableCell>
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            onClick={() => removeUserAssignmentMutation.mutate({ 
+                              type: 'region', 
+                              assignmentId: assignment.id 
+                            })}
+                            disabled={removeUserAssignmentMutation.isPending}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-8">
+                        <p className="text-muted-foreground">No region assignments found</p>
+                        <p className="text-sm text-muted-foreground">Assign controllers to regions using the form above</p>
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -366,36 +407,52 @@ export const UserAssignmentManagement = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {branchAssignments?.map((assignment) => (
-                    <TableRow key={assignment.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {getRoleIcon(assignment.user_role?.role || '')}
-                          {assignment.user_role?.display_name || 'Unknown User'}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {assignment.user_role?.role?.replace('_', ' ')}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{assignment.branch?.name}</TableCell>
-                      <TableCell>{assignment.branch?.region?.name}</TableCell>
-                      <TableCell>
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          onClick={() => removeUserAssignmentMutation.mutate({ 
-                            type: 'branch', 
-                            assignmentId: assignment.id 
-                          })}
-                          disabled={removeUserAssignmentMutation.isPending}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                  {branchAssignmentsLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-4">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
+                        <p className="text-sm text-muted-foreground mt-2">Loading assignments...</p>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : branchAssignments && branchAssignments.length > 0 ? (
+                    branchAssignments.map((assignment) => (
+                      <TableRow key={assignment.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {getRoleIcon(assignment.user_role?.role || '')}
+                            {assignment.user_role?.display_name || 'Unknown User'}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {assignment.user_role?.role?.replace('_', ' ')}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{assignment.branch?.name}</TableCell>
+                        <TableCell>{assignment.branch?.region?.name}</TableCell>
+                        <TableCell>
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            onClick={() => removeUserAssignmentMutation.mutate({ 
+                              type: 'branch', 
+                              assignmentId: assignment.id 
+                            })}
+                            disabled={removeUserAssignmentMutation.isPending}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8">
+                        <p className="text-muted-foreground">No branch assignments found</p>
+                        <p className="text-sm text-muted-foreground">Assign managers and users to branches using the form above</p>
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>

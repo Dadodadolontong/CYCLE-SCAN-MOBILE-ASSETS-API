@@ -82,7 +82,9 @@ export const useUsersWithRoles = () => {
   return useQuery({
     queryKey: ['users-with-roles'],
     queryFn: async () => {
+      console.log('🔍 [useUsersWithRoles] Fetching users with roles...');
       const data = await fastapiClient.get<UserWithRole[]>('/user-assignments/users-with-roles');
+      console.log('🔍 [useUsersWithRoles] Received data:', data);
       return data;
     },
   });
@@ -93,7 +95,9 @@ export const useAllCountryAssignments = () => {
   return useQuery({
     queryKey: ['all-country-assignments'],
     queryFn: async () => {
+      console.log('🔍 [useAllCountryAssignments] Fetching country assignments...');
       const data = await fastapiClient.get<CountryAssignment[]>('/user-assignments/country-assignments');
+      console.log('🔍 [useAllCountryAssignments] Received data:', data);
       return data;
     },
   });
@@ -104,7 +108,9 @@ export const useAllRegionAssignments = () => {
   return useQuery({
     queryKey: ['all-region-assignments'],
     queryFn: async () => {
+      console.log('🔍 [useAllRegionAssignments] Fetching region assignments...');
       const data = await fastapiClient.get<RegionAssignment[]>('/user-assignments/region-assignments');
+      console.log('🔍 [useAllRegionAssignments] Received data:', data);
       return data;
     },
   });
@@ -115,7 +121,9 @@ export const useAllBranchAssignments = () => {
   return useQuery({
     queryKey: ['all-branch-assignments'],
     queryFn: async () => {
+      console.log('🔍 [useAllBranchAssignments] Fetching branch assignments...');
       const data = await fastapiClient.get<BranchAssignment[]>('/user-assignments/branch-assignments');
+      console.log('🔍 [useAllBranchAssignments] Received data:', data);
       return data;
     },
   });
