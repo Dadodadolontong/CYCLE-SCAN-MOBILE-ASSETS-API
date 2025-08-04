@@ -14,8 +14,12 @@
  *   - custom: Use custom path from VITE_BASE_PATH env var
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const scenarios = {
   root: {
@@ -98,18 +102,14 @@ function main() {
     console.log('⚠️  Note: Root deployment requires proper server configuration');
     console.log('   - Configure your web server to serve the app from root');
     console.log('   - Ensure all routes fall back to index.html for SPA routing');
-  }
-  
-  if (scenario === 'subdir') {
+  } else if (scenario === 'subdir') {
     console.log('');
-    console.log('📁 Subdirectory deployment ready');
-    console.log('   - App will be served from /assetmgmt/');
-    console.log('   - Update your web server to serve from the subdirectory');
+    console.log('⚠️  Note: Subdirectory deployment requires:');
+    console.log('   - Configure your web server to serve the app from /assetmgmt/');
+    console.log('   - Update your reverse proxy configuration');
+    console.log('   - Ensure the base path is correctly set in your deployment');
   }
 }
 
-if (require.main === module) {
-  main();
-}
-
-module.exports = { scenarios, generateEnvFile }; 
+// Run the script
+main(); 
