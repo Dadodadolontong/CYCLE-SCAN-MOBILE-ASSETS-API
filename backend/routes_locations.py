@@ -84,10 +84,13 @@ def delete_region(
 @router.get("/branches")
 def list_branches(
     region_id: Optional[str] = None,
+    search: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 50,
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    return LocationService(db).list_branches(user_id=current_user.id, region_id=region_id)
+    return LocationService(db).list_branches(user_id=current_user.id, region_id=region_id, search=search, skip=skip, limit=limit)
 
 @router.post("/branches")
 def create_branch(
@@ -118,7 +121,38 @@ def delete_branch(
 @router.get("")
 def list_locations(
     branch_id: Optional[str] = None,
+    search: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 50,
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    return LocationService(db).list_locations(user_id=current_user.id, branch_id=branch_id) 
+    return LocationService(db).list_locations(user_id=current_user.id, branch_id=branch_id, search=search, skip=skip, limit=limit)
+
+@router.post("")
+def create_location(
+    name: str = Body(...),
+    description: Optional[str] = Body(None),
+    erp_location_id: Optional[str] = Body(None),
+    branch_id: Optional[str] = Body(None),
+    db: Session = Depends(get_db),
+    current_user = Depends(require_role("admin"))
+):
+    return LocationService(db).create_location(name, description, erp_location_id, branch_id)
+
+@router.put("/{location_id}")
+def update_location(
+    location_id: str,
+    updates: dict = Body(...),
+    db: Session = Depends(get_db),
+    current_user = Depends(require_role("admin"))
+):
+    return LocationService(db).update_location(location_id, updates)
+
+@router.delete("/{location_id}")
+def delete_location(
+    location_id: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_role("admin"))
+):
+    return LocationService(db).delete_location(location_id) 

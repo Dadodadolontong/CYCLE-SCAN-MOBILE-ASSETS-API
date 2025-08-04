@@ -27,6 +27,8 @@ from routes_admin import router as admin_router
 from routes_asset_transfer import router as asset_transfer_router
 from config import config
 from routes_oauth_providers import router as oauth_providers_router
+from routes_erp_integration import router as erp_integration_router
+import logging
 
 load_dotenv()
 
@@ -92,6 +94,7 @@ app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(asset_transfer_router)
 app.include_router(oauth_providers_router)
+app.include_router(erp_integration_router)
 
 @app.get("/")
 def read_root():

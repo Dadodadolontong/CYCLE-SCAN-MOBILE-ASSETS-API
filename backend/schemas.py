@@ -1,11 +1,11 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 class LocationBase(BaseModel):
     name: str
     description: Optional[str] = None
-    erp_location_id: Optional[str] = None
+    erp_location_id: Optional[int] = None
     branch_id: Optional[str] = None
 
 class LocationCreate(LocationBase):
@@ -64,7 +64,7 @@ class RegionOut(RegionBase):
 
 # Asset schemas
 class AssetBase(BaseModel):
-    erp_asset_id: str
+    erp_asset_id: int
     name: str
     barcode: Optional[str] = None
     model: Optional[str] = None
@@ -315,3 +315,23 @@ class OAuthProviderOut(OAuthProviderBase):
 
     class Config:
         from_attributes = True 
+
+# ERP Integration schemas
+class ERPAssetPayload(BaseModel):
+    barcode: str  # Maps to barcode
+    name: str  # Maps to description/name
+    model: Optional[str] = None  # Maps to model
+    build: Optional[str] = None  # Maps to build
+    erp_asset_id: int # Maps to asset_id
+    category: Optional[str] = None  # Maps to attribute_category_code
+    location_id: str  # ERP location ID, must lookup to location table
+
+class ERPAssetResponse(BaseModel):
+    success: bool
+    message: str
+    assets_processed: int = 0
+    assets_created: int = 0
+    assets_updated: int = 0
+    locations_synced: int = 0
+    errors: List[str] = []
+    details: Optional[Dict[str, Any]] = None 

@@ -52,6 +52,20 @@ class Config:
 
     # Environment
     NODE_ENV: str = os.getenv("NODE_ENV", "development")
+    
+    # ERP Integration Configuration
+    ERP_API_TIMEOUT: int = int(os.getenv("ERP_API_TIMEOUT", "30"))
+    ERP_DEFAULT_BATCH_SIZE: int = int(os.getenv("ERP_DEFAULT_BATCH_SIZE", "100"))
+    ERP_MAX_RETRIES: int = int(os.getenv("ERP_MAX_RETRIES", "3"))
+    
+    # Oracle Database Configuration for ERP
+    ORACLE_HOST: str = os.getenv("ORACLE_HOST", "")
+    ORACLE_PORT: int = int(os.getenv("ORACLE_PORT", "1521"))
+    ORACLE_SERVICE: str = os.getenv("ORACLE_SERVICE", "")
+    ORACLE_USERNAME: str = os.getenv("ORACLE_USERNAME", "")
+    ORACLE_PASSWORD: str = os.getenv("ORACLE_PASSWORD", "")
+    ORACLE_SCHEMA: str = os.getenv("ORACLE_SCHEMA", "")
+    ORACLE_CLIENT_PATH: str = os.getenv("ORACLE_CLIENT_PATH", "")
 
     @classmethod
     def is_development(cls) -> bool:

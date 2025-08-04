@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException
 from typing import List, Dict, Any, Optional
-from models import Country, Region, Branch, UserCountryAssignment, UserRegionAssignment, UserBranchAssignment, UserRole, Profile
+from models import Country, Region, Branch, Location, UserCountryAssignment, UserRegionAssignment, UserBranchAssignment, UserRole, Profile
 import uuid
 from utils import get_access_scope_for_user
 
@@ -212,17 +212,23 @@ class LocationService:
         return {'ok': True, 'id': region_id}
 
     # Branch CRUD
-    def list_branches(self, user_id: Optional[str] = None, region_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def list_branches(self, user_id: Optional[str] = None, region_id: Optional[str] = None, search: Optional[str] = None, skip: int = 0, limit: int = 50) -> Dict[str, Any]:
         q = self.db.query(Branch).join(Region, Branch.region_id == Region.id).join(Country, Region.country_id == Country.id)
         if region_id:
             q = q.filter(Branch.region_id == region_id)
+        if search:
+            q = q.filter(Branch.name.ilike(f'%{search}%'))
         if user_id:
             scope = get_access_scope_for_user(self.db, user_id)
             if not scope['is_admin']:
                 allowed_ids = set(scope['branch_ids'])
                 q = q.filter(Branch.id.in_(allowed_ids))
         
-        branches = q.order_by(Branch.name).all()
+        # Get total count
+        total = q.count()
+        
+        # Apply pagination
+        branches = q.order_by(Branch.name).offset(skip).limit(limit).all()
         result = []
         
         for branch in branches:
@@ -259,7 +265,12 @@ class LocationService:
                 'updated_at': branch.updated_at,
             })
         
-        return result
+        return {
+            'items': result,
+            'total': total,
+            'skip': skip,
+            'limit': limit
+        }
 
     def create_branch(self, name: str, region_id: str) -> Dict[str, Any]:
         branch = Branch(name=name, region_id=region_id)
@@ -334,17 +345,24 @@ class LocationService:
             raise HTTPException(status_code=400, detail='Failed to delete branch')
         return {'ok': True, 'id': branch_id}
 
-    def list_locations(self, user_id: Optional[str] = None, branch_id: Optional[str] = None) -> List[Dict[str, Any]]:
-        from models import Location
+    def list_locations(self, user_id: Optional[str] = None, branch_id: Optional[str] = None, search: Optional[str] = None, skip: int = 0, limit: int = 50) -> Dict[str, Any]:
         q = self.db.query(Location)
         if branch_id:
             q = q.filter(Location.branch_id == branch_id)
+        if search:
+            q = q.filter(Location.name.ilike(f'%{search}%'))
         if user_id:
             scope = get_access_scope_for_user(self.db, user_id)
             if not scope['is_admin']:
                 allowed_ids = set(scope['location_ids'])
                 q = q.filter(Location.id.in_(allowed_ids))
-        return [
+        
+        # Get total count
+        total = q.count()
+        
+        # Apply pagination
+        locations = q.order_by(Location.name).offset(skip).limit(limit).all()
+        result = [
             {
                 'id': l.id,
                 'name': l.name,
@@ -354,5 +372,71 @@ class LocationService:
                 'created_at': l.created_at,
                 'updated_at': l.updated_at,
             }
-            for l in q.order_by(Location.name).all()
-        ] 
+            for l in locations
+        ]
+        
+        return {
+            'items': result,
+            'total': total,
+            'skip': skip,
+            'limit': limit
+        }
+
+    def create_location(self, name: str, description: Optional[str] = None, erp_location_id: Optional[str] = None, branch_id: Optional[str] = None) -> Dict[str, Any]:
+        location = Location(
+            id=str(uuid.uuid4()),
+            name=name,
+            description=description,
+            erp_location_id=erp_location_id,
+            branch_id=branch_id
+        )
+        self.db.add(location)
+        try:
+            self.db.commit()
+            self.db.refresh(location)
+        except IntegrityError:
+            self.db.rollback()
+            raise HTTPException(status_code=400, detail='Failed to create location')
+        return {
+            'id': location.id,
+            'name': location.name,
+            'description': location.description,
+            'erp_location_id': location.erp_location_id,
+            'branch_id': location.branch_id,
+            'created_at': location.created_at,
+            'updated_at': location.updated_at,
+        }
+
+    def update_location(self, location_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
+        location = self.db.query(Location).filter(Location.id == location_id).first()
+        if not location:
+            raise HTTPException(status_code=404, detail='Location not found')
+        for k, v in updates.items():
+            setattr(location, k, v)
+        try:
+            self.db.commit()
+            self.db.refresh(location)
+        except IntegrityError:
+            self.db.rollback()
+            raise HTTPException(status_code=400, detail='Failed to update location')
+        return {
+            'id': location.id,
+            'name': location.name,
+            'description': location.description,
+            'erp_location_id': location.erp_location_id,
+            'branch_id': location.branch_id,
+            'created_at': location.created_at,
+            'updated_at': location.updated_at,
+        }
+
+    def delete_location(self, location_id: str) -> Dict[str, Any]:
+        location = self.db.query(Location).filter(Location.id == location_id).first()
+        if not location:
+            raise HTTPException(status_code=404, detail='Location not found')
+        self.db.delete(location)
+        try:
+            self.db.commit()
+        except IntegrityError:
+            self.db.rollback()
+            raise HTTPException(status_code=400, detail='Failed to delete location')
+        return {'ok': True, 'id': location_id} 

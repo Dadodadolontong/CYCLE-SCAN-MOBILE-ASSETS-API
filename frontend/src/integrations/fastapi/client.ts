@@ -28,6 +28,47 @@ export interface ApiError {
   detail: string;
 }
 
+export interface ERPSyncResponse {
+  success: boolean;
+  message: string;
+  assets_processed: number;
+  assets_created: number;
+  assets_updated: number;
+  locations_synced: number;
+  errors: string[];
+  details?: any;
+}
+
+export interface SyncLog {
+  id: string;
+  sync_type: string;
+  status: string;
+  started_at: string;
+  completed_at: string;
+  assets_synced: number;
+  errors_count: number;
+  initiated_by: string;
+  error_details?: string;
+}
+
+export interface SyncHistoryResponse {
+  sync_logs: SyncLog[];
+  total: number;
+}
+
+export interface ERPSyncConfig {
+  last_asset_sync: string;
+  last_location_sync: string;
+  total_assets_synced: number;
+  total_locations_synced: number;
+}
+
+export interface OracleConnectionTest {
+  success: boolean;
+  message: string;
+  details?: any;
+}
+
 class FastAPIClient {
   private baseURL: string;
   private token: string | null = null;
@@ -162,7 +203,34 @@ class FastAPIClient {
   }
 
   async delete<T>(endpoint: string): Promise<T> {
-    return this.request<T>(endpoint, { method: 'DELETE' });
+    return this.request<T>(endpoint, {
+      method: 'DELETE',
+    });
+  }
+
+  // ERP Integration methods
+  async syncAssetsFromOracle(forceFullSync: boolean = false): Promise<ERPSyncResponse> {
+    return this.post<ERPSyncResponse>(`/erp/sync-assets?force_full_sync=${forceFullSync}`);
+  }
+
+  async syncLocationsFromOracle(): Promise<ERPSyncResponse> {
+    return this.post<ERPSyncResponse>('/erp/sync-locations');
+  }
+
+  async getSyncHistory(limit: number = 50): Promise<SyncHistoryResponse> {
+    return this.get<SyncHistoryResponse>(`/erp/sync-history?limit=${limit}`);
+  }
+
+  async testOracleConnection(): Promise<OracleConnectionTest> {
+    return this.get<OracleConnectionTest>('/erp/test-connection');
+  }
+
+  async getSyncConfig(): Promise<ERPSyncConfig> {
+    return this.get<ERPSyncConfig>('/erp/sync-config');
+  }
+
+  async getLocationsMapping(): Promise<any> {
+    return this.get('/erp/locations-mapping');
   }
 }
 
@@ -170,7 +238,7 @@ class FastAPIClient {
 let _fastapiClient: FastAPIClient | null = null;
 export const fastapiClient = (() => {
   if (!_fastapiClient) {
-    _fastapiClient = new FastAPIClient(config.api.url);
+    _fastapiClient = new FastAPIClient(API_BASE_URL);
   }
   return _fastapiClient;
 })();

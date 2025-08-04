@@ -79,7 +79,7 @@ class Location(Base):
     id = Column(String(36), primary_key=True)
     name = Column(String(255), unique=True, nullable=False)
     description = Column(String(255))
-    erp_location_id = Column(String(64), index=True)
+    erp_location_id = Column(Integer, index=True)
     branch_id = Column(String(36), ForeignKey('branches.id'), nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
@@ -87,7 +87,7 @@ class Location(Base):
 class Asset(Base):
     __tablename__ = 'assets'
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), server_default=text('uuid()'))
-    erp_asset_id = Column(String(64), unique=True, nullable=False)
+    erp_asset_id = Column(Integer, unique=True, nullable=False)
     name = Column(String(255), nullable=False)
     barcode = Column(String(64), index=True)
     model = Column(String(128))
@@ -188,6 +188,16 @@ class SyncLog(Base):
     scheduled_at = Column(DateTime)
     schedule_type = Column(String(32))
     next_run_at = Column(DateTime)
+
+class ERPSyncConfig(Base):
+    __tablename__ = 'erp_sync_configs'
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    sync_type = Column(String(32), nullable=False, default='asset_sync')
+    last_sync_date = Column(DateTime, nullable=False, server_default=func.now())
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    __table_args__ = (UniqueConstraint('sync_type', name='uq_sync_type'),)
 
 class AuditLog(Base):
     __tablename__ = 'audit_logs'

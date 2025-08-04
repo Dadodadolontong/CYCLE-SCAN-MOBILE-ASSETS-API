@@ -7,6 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
+    "build:root": "node deploy-config.js root && vite build",
+    "build:subdir": "node deploy-config.js subdir && vite build",
+    "build:custom": "node deploy-config.js custom && vite build",
+    "deploy:config": "node deploy-config.js",
     "lint": "eslint .",
     "preview": "vite preview"
   },

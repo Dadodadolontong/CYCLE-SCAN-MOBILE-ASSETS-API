@@ -1,0 +1,27 @@
+{
+  "name": "<%- VITE_APP_TITLE || 'Asset Cycle Count' %>",
+  "short_name": "<%- VITE_APP_SHORT_NAME || 'Cycle Count' %>",
+  "description": "<%- VITE_APP_DESCRIPTION || 'Professional PWA for warehouse asset management with barcode scanning' %>",
+  "start_url": "<%- VITE_BASE_PATH || '/assetmgmt' %>/",
+  "display": "standalone",
+  "background_color": "#f4f7fa",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "<%- VITE_BASE_PATH || '/assetmgmt' %>/placeholder.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "<%- VITE_BASE_PATH || '/assetmgmt' %>/placeholder.svg", 
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "business"],
+  "lang": "en",
+  "dir": "ltr"
+} 

@@ -39,13 +39,25 @@ export interface BranchUpdate {
   region_id?: string;
 }
 
-export const useBranches = (regionId?: string) => {
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
+export const useBranches = (regionId?: string, search?: string, skip: number = 0, limit: number = 20) => {
   return useQuery({
-    queryKey: ['branches', regionId],
+    queryKey: ['branches', regionId, search, skip, limit],
     queryFn: async () => {
-      const endpoint = regionId ? `/locations/branches?region_id=${regionId}` : '/locations/branches';
-      const data = await fastapiClient.get<Branch[]>(endpoint);
-      return data.sort((a, b) => a.name.localeCompare(b.name));
+      const params = new URLSearchParams();
+      if (regionId) params.append('region_id', regionId);
+      if (search) params.append('search', search);
+      params.append('skip', skip.toString());
+      params.append('limit', limit.toString());
+      
+      const data = await fastapiClient.get<PaginatedResponse<Branch>>(`/locations/branches?${params.toString()}`);
+      return data;
     },
   });
 };

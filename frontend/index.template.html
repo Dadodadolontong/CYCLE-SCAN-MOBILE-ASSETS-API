@@ -3,22 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Asset Cycle Count</title>
-    <meta name="description" content="Professional PWA for warehouse asset management with barcode scanning" />
+    <title><%- VITE_APP_TITLE || 'Asset Cycle Count' %></title>
+    <meta name="description" content="<%- VITE_APP_DESCRIPTION || 'Professional PWA for warehouse asset management with barcode scanning' %>" />
     <meta name="author" content="Lovable" />
     
     <!-- PWA manifest -->
-    <link rel="manifest" href="/assetmgmt/manifest.json" />
+    <link rel="manifest" href="<%- VITE_BASE_PATH || '/assetmgmt' %>/manifest.json" />
     <meta name="theme-color" content="#2563eb" />
     
     <!-- Mobile optimizations -->
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="Cycle Count" />
+    <meta name="apple-mobile-web-app-title" content="<%- VITE_APP_SHORT_NAME || 'Cycle Count' %>" />
 
-    <meta property="og:title" content="Asset Cycle Count" />
-    <meta property="og:description" content="Professional PWA for warehouse asset management with barcode scanning" />
+    <meta property="og:title" content="<%- VITE_APP_TITLE || 'Asset Cycle Count' %>" />
+    <meta property="og:description" content="<%- VITE_APP_DESCRIPTION || 'Professional PWA for warehouse asset management with barcode scanning' %>" />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
 

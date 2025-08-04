@@ -21,12 +21,25 @@ import AssetTransferCreate from "./pages/AssetTransferCreate";
 
 const queryClient = new QueryClient();
 
+// Get base path from environment variable
+const getBasePath = () => {
+  const basePath = import.meta.env.VITE_BASE_PATH;
+  
+  if (basePath) {
+    // Remove trailing slash if present and ensure it starts with /
+    return basePath.replace(/\/$/, '');
+  }
+  
+  // Default to root when VITE_BASE_PATH is not defined
+  return '/';
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter basename="/assetmgmt">
+      <BrowserRouter basename={getBasePath()}>
         <AuthProvider>
           <Routes>
             <Route path="/" element={<Index />} />
