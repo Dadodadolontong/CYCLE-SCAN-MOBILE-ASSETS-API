@@ -48,7 +48,7 @@ export default defineConfig(({ mode }) => {
   
   // Get port with fallback for development
   const port = env.VITE_FRONTEND_PORT || (mode === 'development' ? '8080' : '3000');
-  const host = env.VITE_FRONTEND_HOST || (mode === 'development' ? 'dev-frontend.local' : 'localhost');
+  const host = env.VITE_FRONTEND_HOST || 'localhost';
 
   // Get base path from environment with fallback
   const basePath = env.VITE_BASE_PATH || '/';
@@ -77,7 +77,7 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       hmr: {
         host: host,
-        port: 8001,
+        port: parseInt(port) + 1, // Use next port for HMR
       },
     },
     plugins: [

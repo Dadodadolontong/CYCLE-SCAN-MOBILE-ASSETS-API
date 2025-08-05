@@ -26,39 +26,50 @@ const scenarios = {
     VITE_BASE_PATH: '/',
     VITE_APP_TITLE: 'Asset Cycle Count',
     VITE_APP_SHORT_NAME: 'Cycle Count',
-    VITE_APP_DESCRIPTION: 'Professional PWA for warehouse asset management with barcode scanning'
+    VITE_APP_DESCRIPTION: 'Professional PWA for warehouse asset management with barcode scanning',
+    VITE_API_URL: 'http://localhost:8002',
+    VITE_FRONTEND_URL: 'http://localhost:8080',
+    VITE_NODE_ENV: 'development',
+    VITE_ENABLE_DEBUG: 'true',
+    VITE_ENABLE_ANALYTICS: 'false'
   },
   custom: {
     // Uses environment variables
     VITE_BASE_PATH: process.env.VITE_BASE_PATH || '/',
     VITE_APP_TITLE: process.env.VITE_APP_TITLE || 'Asset Cycle Count',
     VITE_APP_SHORT_NAME: process.env.VITE_APP_SHORT_NAME || 'Cycle Count',
-    VITE_APP_DESCRIPTION: process.env.VITE_APP_DESCRIPTION || 'Professional PWA for warehouse asset management with barcode scanning'
+    VITE_APP_DESCRIPTION: process.env.VITE_APP_DESCRIPTION || 'Professional PWA for warehouse asset management with barcode scanning',
+    VITE_API_URL: process.env.VITE_API_URL || 'http://localhost:8002',
+    VITE_FRONTEND_URL: process.env.VITE_FRONTEND_URL || 'http://localhost:8080',
+    VITE_NODE_ENV: process.env.VITE_NODE_ENV || 'development',
+    VITE_ENABLE_DEBUG: process.env.VITE_ENABLE_DEBUG || 'true',
+    VITE_ENABLE_ANALYTICS: process.env.VITE_ENABLE_ANALYTICS || 'false'
   }
 };
 
 function generateEnvFile(config, outputPath = '.env') {
   const envContent = `# Deployment Configuration
-  VITE_BASE_PATH=${config.VITE_BASE_PATH}
-  VITE_APP_TITLE=${config.VITE_APP_TITLE}ss
-  VITE_APP_SHORT_NAME=${config.VITE_APP_SHORT_NAME}
-  VITE_APP_DESCRIPTION=${config.VITE_APP_DESCRIPTION}
+VITE_BASE_PATH=${config.VITE_BASE_PATH}
+VITE_APP_TITLE=${config.VITE_APP_TITLE}
+VITE_APP_SHORT_NAME=${config.VITE_APP_SHORT_NAME}
+VITE_APP_DESCRIPTION=${config.VITE_APP_DESCRIPTION}
 
-  # API Configuration (REQUIRED)
-  VITE_API_URL=${config.VITE_API_URL}
-  VITE_API_TIMEOUT=30000
+# API Configuration (REQUIRED)
+VITE_API_URL=${config.VITE_API_URL}
+VITE_API_TIMEOUT=30000
 
-  # Frontend Configuration (REQUIRED)
-  VITE_FRONTEND_URL=${config.VITE_FRONTEND_URL}
-  VITE_FRONTEND_PORT=8080
+# Frontend Configuration (REQUIRED)
+VITE_FRONTEND_URL=${config.VITE_FRONTEND_URL}
+VITE_FRONTEND_PORT=8080
+VITE_FRONTEND_HOST=localhost
 
-  # Environment
-  VITE_NODE_ENV=${config.VITE_NODE_ENV}
+# Environment
+VITE_NODE_ENV=${config.VITE_NODE_ENV}
 
-  # Feature Flags
-  VITE_ENABLE_DEBUG=${config.VITE_ENABLE_DEBUG}
-  VITE_ENABLE_ANALYTICS=${config.VITE_ENABLE_ANALYTICS}
-  `;
+# Feature Flags
+VITE_ENABLE_DEBUG=${config.VITE_ENABLE_DEBUG}
+VITE_ENABLE_ANALYTICS=${config.VITE_ENABLE_ANALYTICS}
+`;
 
   fs.writeFileSync(outputPath, envContent);
   console.log(`✅ Generated ${outputPath} with configuration:`);

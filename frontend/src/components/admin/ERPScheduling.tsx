@@ -110,32 +110,44 @@ export const ERPScheduling = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-600">
-                  {syncConfig.total_assets_synced}
+                  {syncConfig.total_assets_synced || 0}
                 </div>
                 <div className="text-sm text-muted-foreground">Total Assets</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-green-600">
-                  {syncConfig.total_locations_synced}
+                  {syncConfig.total_locations_synced || 0}
                 </div>
                 <div className="text-sm text-muted-foreground">Total Locations</div>
               </div>
               <div className="text-center">
-                <div className="text-sm font-medium">
-                  {syncConfig.last_asset_sync ? 
-                    format(new Date(syncConfig.last_asset_sync), 'MMM dd, yyyy HH:mm') : 
-                    'Never'
-                  }
-                </div>
+                                    <div className="text-sm font-medium">
+                      {syncConfig.last_asset_sync ? 
+                        (() => {
+                          try {
+                            return format(new Date(syncConfig.last_asset_sync), 'MMM dd, yyyy HH:mm');
+                          } catch {
+                            return 'Invalid Date';
+                          }
+                        })() : 
+                        'Never'
+                      }
+                    </div>
                 <div className="text-sm text-muted-foreground">Last Asset Sync</div>
               </div>
               <div className="text-center">
-                <div className="text-sm font-medium">
-                  {syncConfig.last_location_sync ? 
-                    format(new Date(syncConfig.last_location_sync), 'MMM dd, yyyy HH:mm') : 
-                    'Never'
-                  }
-                </div>
+                                    <div className="text-sm font-medium">
+                      {syncConfig.last_location_sync ? 
+                        (() => {
+                          try {
+                            return format(new Date(syncConfig.last_location_sync), 'MMM dd, yyyy HH:mm');
+                          } catch {
+                            return 'Invalid Date';
+                          }
+                        })() : 
+                        'Never'
+                      }
+                    </div>
                 <div className="text-sm text-muted-foreground">Last Location Sync</div>
               </div>
             </div>
@@ -232,7 +244,7 @@ export const ERPScheduling = () => {
                     <div className="flex items-center space-x-2">
                       {getStatusIcon(log.status)}
                       <span className="font-medium capitalize">
-                        {log.sync_type.replace('_', ' ')} Sync
+                        {log.sync_type ? log.sync_type.replace('_', ' ') : 'Unknown'} Sync
                       </span>
                     </div>
                     {getStatusBadge(log.status)}
@@ -241,30 +253,45 @@ export const ERPScheduling = () => {
                     <div>
                       <span className="font-medium">Started:</span>
                       <br />
-                      {format(new Date(log.started_at), 'MMM dd, yyyy HH:mm')}
+                      {log.started_at ? 
+                        (() => {
+                          try {
+                            return format(new Date(log.started_at), 'MMM dd, yyyy HH:mm');
+                          } catch {
+                            return 'Invalid Date';
+                          }
+                        })() : 
+                        'Unknown'
+                      }
                     </div>
                     <div>
                       <span className="font-medium">Completed:</span>
                       <br />
                       {log.completed_at ? 
-                        format(new Date(log.completed_at), 'MMM dd, yyyy HH:mm') : 
+                        (() => {
+                          try {
+                            return format(new Date(log.completed_at), 'MMM dd, yyyy HH:mm');
+                          } catch {
+                            return 'Invalid Date';
+                          }
+                        })() : 
                         'In Progress'
                       }
                     </div>
                     <div>
                       <span className="font-medium">Assets Synced:</span>
                       <br />
-                      {log.assets_synced}
+                      {log.assets_synced || 0}
                     </div>
                     <div>
                       <span className="font-medium">Errors:</span>
                       <br />
-                      {log.errors_count}
+                      {log.errors_count || 0}
                     </div>
                   </div>
                   {log.error_details && (
                     <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">
-                      <span className="font-medium">Error:</span> {log.error_details}
+                      <span className="font-medium">Error:</span> {typeof log.error_details === 'string' ? log.error_details : JSON.stringify(log.error_details)}
                     </div>
                   )}
                 </div>

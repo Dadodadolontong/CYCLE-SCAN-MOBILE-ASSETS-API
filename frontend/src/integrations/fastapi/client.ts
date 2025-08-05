@@ -48,7 +48,7 @@ export interface SyncLog {
   assets_synced: number;
   errors_count: number;
   initiated_by: string;
-  error_details?: string;
+  error_details?: string | any; // Allow both string and object for flexibility
 }
 
 export interface SyncHistoryResponse {

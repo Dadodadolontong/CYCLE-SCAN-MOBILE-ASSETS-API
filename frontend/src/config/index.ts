@@ -44,7 +44,7 @@ export const config: Config = {
   frontend: {
     url: import.meta.env.VITE_FRONTEND_URL || (isDevMode ? 'http://localhost:8080' : ''),
     port: parseInt(import.meta.env.VITE_FRONTEND_PORT || (isDevMode ? '8080' : '3000')),
-    host: import.meta.env.VITE_FRONTEND_HOST || (isDevMode ? 'dev-frontend.local' : 'localhost'),
+    host: import.meta.env.VITE_FRONTEND_HOST || 'localhost',
     allowedHosts: import.meta.env.VITE_ALLOWED_HOSTS ? 
       import.meta.env.VITE_ALLOWED_HOSTS.split(',').map(h => h.trim()).filter(Boolean) : 
       undefined,
