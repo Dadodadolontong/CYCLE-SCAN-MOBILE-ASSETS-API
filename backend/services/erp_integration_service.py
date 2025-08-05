@@ -26,6 +26,9 @@ class ERPIntegrationService:
             d = f"{config.ORACLE_CLIENT_PATH}"
             logger.info(f"Initializing Oracle client with lib_dir: {d}")            
             oracledb.init_oracle_client(lib_dir=d)
+        elif os == "Linux":
+            logger.info("Initializing Oracle client")
+            oracledb.init_oracle_client()
 
         try:
             # Build Oracle connection string
