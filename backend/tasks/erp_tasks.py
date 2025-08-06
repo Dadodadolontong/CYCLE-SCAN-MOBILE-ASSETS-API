@@ -233,7 +233,9 @@ def sync_assets_from_oracle_task(self, user_id: str = None, force_full_sync: boo
         except:
             pass
 
-@celery_app.task(bind=True, name="tasks.erp_tasks.sync_locations_from_oracle")
+task_kwargs = {"time_limit": 10 if current_platform == "windows" else {},"bind": True,"name": "tasks.erp_tasks.sync_locations_from_oracle"}
+
+@celery_app.task(**task_kwargs)
 def sync_locations_from_oracle_task(self, user_id: str = None):
     """
     Background task to sync locations from Oracle ERP
