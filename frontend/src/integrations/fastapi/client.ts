@@ -39,6 +39,30 @@ export interface ERPSyncResponse {
   details?: any;
 }
 
+export interface ERPTaskResponse {
+  success: boolean;
+  message: string;
+  task_id: string;
+  status: string;
+  force_full_sync?: boolean;
+}
+
+export interface ERPTaskStatus {
+  task_id: string;
+  status: string;
+  result?: any;
+  error?: string;
+  progress?: {
+    message?: string;
+    progress?: string;
+    assets_processed?: number;
+    assets_created?: number;
+    assets_updated?: number;
+    total_records?: number;
+    locations_synced?: number;
+  };
+}
+
 export interface SyncLog {
   id: string;
   sync_type: string;
@@ -72,11 +96,17 @@ export interface OracleConnectionTest {
 class FastAPIClient {
   private baseURL: string;
   private token: string | null = null;
+  private onSessionTimeout: (() => void) | null = null;
 
   constructor(baseURL: string) {
     this.baseURL = baseURL;
     // Load token from localStorage on initialization
     this.token = localStorage.getItem('auth_token');
+  }
+
+  // Set session timeout callback
+  setSessionTimeoutCallback(callback: () => void) {
+    this.onSessionTimeout = callback;
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -107,6 +137,15 @@ class FastAPIClient {
       const response = await fetch(url, config);
       
       if (!response.ok) {
+        // Handle 401 Unauthorized (session timeout)
+        if (response.status === 401) {
+          this.clearToken();
+          if (this.onSessionTimeout) {
+            this.onSessionTimeout();
+          }
+          throw new Error('Session expired. Please log in again.');
+        }
+        
         const errorData = await response.json().catch(() => ({ detail: 'Request failed' }));
         throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
       }
@@ -209,12 +248,16 @@ class FastAPIClient {
   }
 
   // ERP Integration methods
-  async syncAssetsFromOracle(forceFullSync: boolean = false): Promise<ERPSyncResponse> {
-    return this.post<ERPSyncResponse>(`/erp/sync-assets?force_full_sync=${forceFullSync}`);
+  async syncAssetsFromOracle(forceFullSync: boolean = false): Promise<ERPTaskResponse> {
+    return this.post<ERPTaskResponse>(`/erp/sync-assets?force_full_sync=${forceFullSync}`);
   }
 
-  async syncLocationsFromOracle(): Promise<ERPSyncResponse> {
-    return this.post<ERPSyncResponse>('/erp/sync-locations');
+  async syncLocationsFromOracle(): Promise<ERPTaskResponse> {
+    return this.post<ERPTaskResponse>('/erp/sync-locations');
+  }
+
+  async getTaskStatus(taskId: string): Promise<ERPTaskStatus> {
+    return this.get<ERPTaskStatus>(`/erp/task-status/${taskId}`);
   }
 
   async getSyncHistory(limit: number = 50): Promise<SyncHistoryResponse> {
@@ -231,6 +274,12 @@ class FastAPIClient {
 
   async getLocationsMapping(): Promise<any> {
     return this.get('/erp/locations-mapping');
+  }
+
+  // Test method to simulate session timeout (for development/testing)
+  async testSessionTimeout(): Promise<void> {
+    // This endpoint should return 401 to test session timeout handling
+    return this.get('/auth/test-timeout');
   }
 }
 

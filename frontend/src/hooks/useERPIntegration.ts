@@ -8,113 +8,80 @@ import type {
   OracleConnectionTest 
 } from '@/integrations/fastapi/client';
 
+// ERP Sync History
 export const useERPSyncHistory = (limit: number = 50) => {
   return useQuery({
-    queryKey: ['erp', 'sync-history', limit],
-    queryFn: () => fastapiClient.getSyncHistory(limit),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    queryKey: ['erp-sync-history', limit],
+    queryFn: async () => {
+      return await fastapiClient.getSyncHistory(limit);
+    },
   });
 };
 
+// ERP Sync Configuration
 export const useERPSyncConfig = () => {
   return useQuery({
-    queryKey: ['erp', 'sync-config'],
-    queryFn: () => fastapiClient.getSyncConfig(),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    queryKey: ['erp-sync-config'],
+    queryFn: async () => {
+      return await fastapiClient.getSyncConfig();
+    },
   });
 };
 
+// Test Oracle Connection
 export const useTestOracleConnection = () => {
   return useMutation({
-    mutationFn: () => fastapiClient.testOracleConnection(),
-    onSuccess: (data) => {
-      if (data.success) {
-        toast({
-          title: "Connection Test Successful",
-          description: data.message,
-        });
-      } else {
-        toast({
-          title: "Connection Test Failed",
-          description: data.message,
-          variant: "destructive",
-        });
-      }
-    },
-    onError: (error) => {
-      toast({
-        title: "Connection Test Error",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive",
-      });
+    mutationFn: async () => {
+      return await fastapiClient.testOracleConnection();
     },
   });
 };
 
+// Background Task Status
+export const useTaskStatus = (taskId: string | null) => {
+  return useQuery({
+    queryKey: ['task-status', taskId],
+    queryFn: async () => {
+      if (!taskId) throw new Error('No task ID provided');
+      return await fastapiClient.getTaskStatus(taskId);
+    },
+    enabled: !!taskId,
+    refetchInterval: (data) => {
+      // Poll every 2 seconds if task is still running
+      return data?.status === 'PENDING' || data?.status === 'PROGRESS' ? 2000 : false;
+    },
+    refetchIntervalInBackground: true,
+  });
+};
+
+// Sync Assets from Oracle (Background Task)
 export const useSyncAssetsFromOracle = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ forceFullSync }: { forceFullSync: boolean }) => 
-      fastapiClient.syncAssetsFromOracle(forceFullSync),
-    onSuccess: (data) => {
-      if (data.success) {
-        toast({
-          title: "Asset Sync Successful",
-          description: `Processed ${data.assets_processed} assets (${data.assets_created} created, ${data.assets_updated} updated)`,
-        });
-        // Invalidate related queries
-        queryClient.invalidateQueries({ queryKey: ['erp', 'sync-history'] });
-        queryClient.invalidateQueries({ queryKey: ['erp', 'sync-config'] });
-        queryClient.invalidateQueries({ queryKey: ['assets'] });
-      } else {
-        toast({
-          title: "Asset Sync Failed",
-          description: data.message,
-          variant: "destructive",
-        });
-      }
+    mutationFn: async ({ forceFullSync }: { forceFullSync: boolean }) => {
+      return await fastapiClient.syncAssetsFromOracle(forceFullSync);
     },
-    onError: (error) => {
-      toast({
-        title: "Asset Sync Error",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive",
-      });
+    onSuccess: (data) => {
+      // Invalidate sync history to show new task
+      queryClient.invalidateQueries({ queryKey: ['erp-sync-history'] });
+      queryClient.invalidateQueries({ queryKey: ['erp-sync-config'] });
     },
   });
 };
 
+// Sync Locations from Oracle (Background Task)
 export const useSyncLocationsFromOracle = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: () => fastapiClient.syncLocationsFromOracle(),
-    onSuccess: (data) => {
-      if (data.success) {
-        toast({
-          title: "Location Sync Successful",
-          description: `Synced ${data.locations_synced} locations`,
-        });
-        // Invalidate related queries
-        queryClient.invalidateQueries({ queryKey: ['erp', 'sync-history'] });
-        queryClient.invalidateQueries({ queryKey: ['erp', 'sync-config'] });
-        queryClient.invalidateQueries({ queryKey: ['locations'] });
-        queryClient.invalidateQueries({ queryKey: ['branches'] });
-      } else {
-        toast({
-          title: "Location Sync Failed",
-          description: data.message,
-          variant: "destructive",
-        });
-      }
+    mutationFn: async () => {
+      return await fastapiClient.syncLocationsFromOracle();
     },
-    onError: (error) => {
-      toast({
-        title: "Location Sync Error",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive",
-      });
+    onSuccess: (data) => {
+      // Invalidate sync history to show new task
+      queryClient.invalidateQueries({ queryKey: ['erp-sync-history'] });
+      queryClient.invalidateQueries({ queryKey: ['erp-sync-config'] });
     },
   });
 }; 

@@ -19,7 +19,31 @@ import { TestCsvUpload } from "./pages/TestCsvUpload";
 import NotFound from "./pages/NotFound";
 import AssetTransferCreate from "./pages/AssetTransferCreate";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error: any) => {
+        // Don't retry on 401 errors (session timeout)
+        if (error?.message?.includes('Session expired') || error?.message?.includes('401')) {
+          return false;
+        }
+        // Retry up to 3 times for other errors
+        return failureCount < 3;
+      },
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    },
+    mutations: {
+      retry: (failureCount, error: any) => {
+        // Don't retry on 401 errors (session timeout)
+        if (error?.message?.includes('Session expired') || error?.message?.includes('401')) {
+          return false;
+        }
+        // Retry up to 1 time for mutations
+        return failureCount < 1;
+      },
+    },
+  },
+});
 
 // Get base path from environment variable
 const getBasePath = () => {

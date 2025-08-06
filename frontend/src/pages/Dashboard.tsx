@@ -25,7 +25,8 @@ const Dashboard = () => {
   const { data: tasksData = { items: [], total: 0 }, isLoading: tasksLoading, error: tasksError } = useCycleCountTasks(undefined, user?.id);
   const tasks = tasksData.items || [];
   const { data: assets = [], isLoading: assetsLoading, error: assetsError } = useAssets();
-  const { data: locations = [], isLoading: locationsLoading, error: locationsError } = useLocations();
+  const { data: locationsData = { items: [], total: 0 }, isLoading: locationsLoading, error: locationsError } = useLocations();
+  const locations = locationsData.items || [];
   const { data: categories = [], isLoading: categoriesLoading, error: categoriesError } = useCategories();
   const { data: assetCount = { count: 0 }, isLoading: assetCountLoading, error: assetCountError } = useAssetCount();
 
@@ -289,6 +290,37 @@ const Dashboard = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Development Test Section - Only show in development */}
+        {import.meta.env.DEV && (
+          <Card className="mt-6 border-orange-200 bg-orange-50">
+            <CardHeader>
+              <CardTitle className="text-orange-800">Development Tests</CardTitle>
+              <CardDescription>Test functionality (only visible in development)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      await fastapiClient.testSessionTimeout();
+                    } catch (error) {
+                      console.log('Session timeout test triggered:', error);
+                    }
+                  }}
+                  className="text-orange-700 border-orange-300"
+                >
+                  Test Session Timeout
+                </Button>
+                <p className="text-xs text-orange-600">
+                  This will trigger a session timeout and redirect to login page
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

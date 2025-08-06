@@ -67,6 +67,12 @@ class Config:
     ORACLE_SCHEMA: str = os.getenv("ORACLE_SCHEMA", "")
     ORACLE_CLIENT_PATH: str = os.getenv("ORACLE_CLIENT_PATH", "")
 
+    # Redis Configuration for Celery
+    REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+    REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+    REDIS_DB = int(os.getenv("REDIS_DB", "0"))
+    REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
+
     @classmethod
     def is_development(cls) -> bool:
         return cls.NODE_ENV.lower() == "development"

@@ -7,57 +7,108 @@ from models import User, SyncLog
 from services.erp_integration_service import ERPIntegrationService
 from schemas import ERPAssetResponse
 from datetime import datetime
+from tasks.erp_tasks import sync_assets_from_oracle_task, sync_locations_from_oracle_task
+from celery.result import AsyncResult
 
 router = APIRouter(prefix="/erp", tags=["ERP Integration"])
 
-@router.post("/sync-locations", response_model=ERPAssetResponse)
+@router.post("/sync-locations", response_model=dict)
 async def sync_locations_from_oracle(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Sync locations from Oracle ERP database
+    Start background sync of locations from Oracle ERP database
     """
     # Check if user has admin role
     require_role("admin")
     
-    erp_service = ERPIntegrationService(db)
-
     try:
-        result = erp_service.sync_locations_from_oracle()
-        return result
+        # Start background task
+        task = sync_locations_from_oracle_task.delay(user_id=current_user.id)
+        
+        return {
+            "success": True,
+            "message": "Location sync started in background",
+            "task_id": task.id,
+            "status": "PENDING"
+        }
+        
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to sync locations from Oracle ERP: {str(e)}"
+            detail=f"Failed to start location sync: {str(e)}"
         )
 
-@router.post("/sync-assets", response_model=ERPAssetResponse)
+@router.post("/sync-assets", response_model=dict)
 async def sync_assets_from_oracle(
     force_full_sync: bool = Query(False, description="Force full sync instead of incremental"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Sync assets from Oracle ERP database
+    Start background sync of assets from Oracle ERP database
     """
     # Check if user has admin role
     require_role("admin")
     
-    erp_service = ERPIntegrationService(db)
-    
     try:
-        result = erp_service.sync_assets_from_oracle(
+        # Start background task
+        task = sync_assets_from_oracle_task.delay(
             user_id=current_user.id,
             force_full_sync=force_full_sync
         )
         
-        return result
+        return {
+            "success": True,
+            "message": "Asset sync started in background",
+            "task_id": task.id,
+            "status": "PENDING",
+            "force_full_sync": force_full_sync
+        }
         
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to sync assets from Oracle ERP: {str(e)}"
+            detail=f"Failed to start asset sync: {str(e)}"
+        )
+
+@router.get("/task-status/{task_id}")
+async def get_task_status(
+    task_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get the status of a background task
+    """
+    # Check if user has admin role
+    require_role("admin")
+    
+    try:
+        # Get task result
+        task_result = AsyncResult(task_id)
+        
+        response = {
+            "task_id": task_id,
+            "status": task_result.status,
+        }
+        
+        if task_result.ready():
+            if task_result.successful():
+                response["result"] = task_result.result
+            else:
+                response["error"] = str(task_result.info)
+        else:
+            # Task is still running, get progress info
+            if task_result.info:
+                response["progress"] = task_result.info
+        
+        return response
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get task status: {str(e)}"
         )
 
 @router.get("/sync-history")
@@ -99,23 +150,15 @@ async def test_oracle_connection(
     db: Session = Depends(get_db)
 ):
     """
-    Test connection to Oracle ERP database
+    Test Oracle ERP database connection
     """
     # Check if user has admin role
     require_role("admin")
     
     erp_service = ERPIntegrationService(db)
+    result = erp_service.test_oracle_connection()
     
-    try:
-        result = erp_service.test_oracle_connection()
-        return result
-        
-    except Exception as e:
-        return {
-            "success": False,
-            "message": f"Error testing Oracle connection: {str(e)}",
-            "error": str(e)
-        }
+    return result
 
 @router.get("/sync-config")
 async def get_sync_config(
@@ -123,26 +166,27 @@ async def get_sync_config(
     db: Session = Depends(get_db)
 ):
     """
-    Get current sync configuration and last sync date
+    Get current ERP sync configuration
     """
     # Check if user has admin role
     require_role("admin")
     
     erp_service = ERPIntegrationService(db)
-    sync_config = erp_service.get_sync_config()
+    config = erp_service.get_sync_config()
     
-    if sync_config:
+    if config:
         return {
-            "sync_type": sync_config.sync_type,
-            "last_sync_date": sync_config.last_sync_date,
-            "created_at": sync_config.created_at,
-            "updated_at": sync_config.updated_at
+            "last_asset_sync": config.last_sync_date.isoformat() if config.last_sync_date else None,
+            "last_location_sync": None,  # TODO: Add location sync tracking
+            "total_assets_synced": 0,  # TODO: Add asset counting
+            "total_locations_synced": 0  # TODO: Add location counting
         }
     else:
         return {
-            "sync_type": "asset_sync",
-            "last_sync_date": None,
-            "message": "No sync configuration found. Will use default date on first sync."
+            "last_asset_sync": None,
+            "last_location_sync": None,
+            "total_assets_synced": 0,
+            "total_locations_synced": 0
         }
 
 @router.get("/locations-mapping")
@@ -151,24 +195,23 @@ async def get_locations_mapping(
     db: Session = Depends(get_db)
 ):
     """
-    Get mapping of ERP location IDs to internal location IDs
+    Get ERP location mapping information
     """
     # Check if user has admin role
-    require_role(current_user, "admin")
+    require_role("admin")
     
-    from models import Location
-    
+    # Get locations with ERP IDs
     locations = db.query(Location).filter(Location.erp_location_id.isnot(None)).all()
     
     return {
-        "locations_mapping": [
+        "locations": [
             {
-                "internal_id": location.id,
-                "internal_name": location.name,
-                "erp_location_id": location.erp_location_id,
-                "description": location.description
+                "id": loc.id,
+                "name": loc.name,
+                "erp_location_id": loc.erp_location_id,
+                "branch_id": loc.branch_id
             }
-            for location in locations
+            for loc in locations
         ],
-        "total_mapped_locations": len(locations)
+        "total": len(locations)
     } 

@@ -539,4 +539,50 @@ class ERPIntegrationService:
                 "success": False,
                 "message": f"Failed to connect to Oracle ERP database: {str(e)}",
                 "error": str(e)
-            } 
+            }
+
+    # Background task helper methods
+    def create_sync_log(self, sync_type: str, initiated_by: str = None, task_id: str = None) -> SyncLog:
+        """
+        Create a new sync log entry for background tasks
+        """
+        sync_log = SyncLog(
+            id=str(uuid.uuid4()),
+            sync_type=sync_type,
+            status="running",
+            initiated_by=initiated_by
+        )
+        self.db.add(sync_log)
+        self.db.commit()
+        self.db.refresh(sync_log)
+        return sync_log
+
+    def update_sync_log_success(self, sync_log_id: str, assets_synced: int, errors_count: int, error_details: Any = None):
+        """
+        Update sync log with success status
+        """
+        sync_log = self.db.query(SyncLog).filter(SyncLog.id == sync_log_id).first()
+        if sync_log:
+            sync_log.status = "completed"
+            sync_log.completed_at = datetime.utcnow()
+            sync_log.assets_synced = assets_synced
+            sync_log.errors_count = errors_count
+            sync_log.error_details = error_details
+            self.db.commit()
+
+    def update_sync_log_error(self, sync_log_id: str, error_message: str):
+        """
+        Update sync log with error status
+        """
+        sync_log = self.db.query(SyncLog).filter(SyncLog.id == sync_log_id).first()
+        if sync_log:
+            sync_log.status = "failed"
+            sync_log.completed_at = datetime.utcnow()
+            sync_log.error_details = {"error": error_message}
+            self.db.commit()
+
+    def get_sync_log_by_task_id(self, task_id: str) -> Optional[SyncLog]:
+        """
+        Get sync log by task ID
+        """
+        return self.db.query(SyncLog).filter(SyncLog.id == task_id).first() 

@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { fastapiClient, UserResponse, LoginRequest, RegisterRequest } from '@/integrations/fastapi/client';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
 
 interface AuthContextType {
   user: UserResponse | null;
@@ -9,6 +10,7 @@ interface AuthContextType {
   signInWithPassword: (email: string, password: string) => Promise<{ error?: any }>;
   signUpWithPassword: (email: string, password: string) => Promise<{ error?: any }>;
   setUser: (user: UserResponse | null) => void;
+  handleSessionTimeout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -25,6 +27,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<UserResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleSessionTimeout = useCallback(() => {
+    setUser(null);
+    // Show session expired notification
+    toast({
+      title: "Session Expired",
+      description: "Your session has expired. Please log in again.",
+      variant: "destructive",
+    });
+    // Only redirect if not already on auth page
+    if (location.pathname !== '/auth') {
+      navigate('/auth', { replace: true });
+    }
+  }, [navigate, location.pathname, toast]);
 
   useEffect(() => {
     // Check for token in URL
@@ -38,6 +56,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [location]);
 
   useEffect(() => {
+    // Set up session timeout handler
+    fastapiClient.setSessionTimeoutCallback(handleSessionTimeout);
+
     // Check for existing authentication on app load
     const checkAuth = async () => {
       try {
@@ -55,7 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     checkAuth();
-  }, []);
+  }, [handleSessionTimeout]);
 
   const signInWithPassword = async (email: string, password: string) => {
     try {
@@ -96,6 +117,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       fastapiClient.clearToken();
       setUser(null);
+      navigate('/auth', { replace: true });
     } catch (error) {
       console.error('Sign out error:', error);
     }
@@ -108,6 +130,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signInWithPassword,
     signUpWithPassword,
     setUser,
+    handleSessionTimeout,
   };
 
   return (

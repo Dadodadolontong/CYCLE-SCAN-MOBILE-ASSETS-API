@@ -22,12 +22,14 @@ import {
   useERPSyncConfig, 
   useTestOracleConnection, 
   useSyncAssetsFromOracle, 
-  useSyncLocationsFromOracle 
+  useSyncLocationsFromOracle,
+  useTaskStatus
 } from '@/hooks/useERPIntegration';
 import { format } from 'date-fns';
 
 export const ERPScheduling = () => {
   const [forceFullSync, setForceFullSync] = useState(false);
+  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   
   // Hooks
   const { data: syncHistory, isLoading: historyLoading } = useERPSyncHistory(20);
@@ -35,13 +37,22 @@ export const ERPScheduling = () => {
   const testConnection = useTestOracleConnection();
   const syncAssets = useSyncAssetsFromOracle();
   const syncLocations = useSyncLocationsFromOracle();
+  const { data: taskStatus } = useTaskStatus(currentTaskId);
 
   const handleAssetSync = () => {
-    syncAssets.mutate({ forceFullSync });
+    syncAssets.mutate({ forceFullSync }, {
+      onSuccess: (data) => {
+        setCurrentTaskId(data.task_id);
+      }
+    });
   };
 
   const handleLocationSync = () => {
-    syncLocations.mutate();
+    syncLocations.mutate(undefined, {
+      onSuccess: (data) => {
+        setCurrentTaskId(data.task_id);
+      }
+    });
   };
 
   const getStatusIcon = (status: string) => {
@@ -51,7 +62,10 @@ export const ERPScheduling = () => {
       case 'failed':
         return <XCircle className="h-4 w-4 text-red-500" />;
       case 'in_progress':
+      case 'progress':
         return <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />;
+      case 'pending':
+        return <AlertCircle className="h-4 w-4 text-yellow-500" />;
       default:
         return <AlertCircle className="h-4 w-4 text-yellow-500" />;
     }
@@ -64,10 +78,151 @@ export const ERPScheduling = () => {
       case 'failed':
         return <Badge variant="destructive">Failed</Badge>;
       case 'in_progress':
+      case 'progress':
         return <Badge variant="secondary" className="bg-blue-100 text-blue-800">In Progress</Badge>;
+      case 'pending':
+        return <Badge variant="outline">Pending</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
+  };
+
+  const renderTaskProgress = () => {
+    if (!currentTaskId || !taskStatus) return null;
+
+    const { status, progress, result, error } = taskStatus;
+
+    return (
+      <Card className="border-blue-200 bg-blue-50">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2 text-blue-800">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            <span>Background Task Progress</span>
+          </CardTitle>
+          <CardDescription>Task ID: {currentTaskId}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="font-medium">Status:</span>
+              {getStatusBadge(status)}
+            </div>
+            
+            {progress && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span>Message:</span>
+                  <span className="text-muted-foreground">{progress.message}</span>
+                </div>
+                
+                {progress.total_records !== undefined && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span>Total Assets from Oracle:</span>
+                    <span className="text-muted-foreground font-medium">{progress.total_records}</span>
+                  </div>
+                )}
+                
+                {progress.progress && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Progress:</span>
+                      <span className="text-muted-foreground">{progress.progress}</span>
+                    </div>
+                    {progress.total_records && progress.assets_processed !== undefined && (
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                          style={{ 
+                            width: `${Math.min((progress.assets_processed / progress.total_records) * 100, 100)}%` 
+                          }}
+                        ></div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {progress.assets_processed !== undefined && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span>Assets Processed:</span>
+                    <span className="text-muted-foreground">{progress.assets_processed}</span>
+                  </div>
+                )}
+                
+                {progress.assets_created !== undefined && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span>Assets Created:</span>
+                    <span className="text-muted-foreground text-green-600">{progress.assets_created}</span>
+                  </div>
+                )}
+                
+                {progress.assets_updated !== undefined && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span>Assets Updated:</span>
+                    <span className="text-muted-foreground text-blue-600">{progress.assets_updated}</span>
+                  </div>
+                )}
+                
+                {progress.locations_synced !== undefined && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span>Locations Synced:</span>
+                    <span className="text-muted-foreground">{progress.locations_synced}</span>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {status === 'SUCCESS' && result && (
+              <div className="mt-4 p-3 bg-green-100 border border-green-200 rounded">
+                <div className="text-sm text-green-800">
+                  <div className="font-medium">Task completed successfully!</div>
+                  <div>{result.message}</div>
+                  {result.assets_processed !== undefined && (
+                    <div>Assets processed: {result.assets_processed}</div>
+                  )}
+                  {result.assets_created !== undefined && (
+                    <div>Assets created: <span className="font-medium">{result.assets_created}</span></div>
+                  )}
+                  {result.assets_updated !== undefined && (
+                    <div>Assets updated: <span className="font-medium">{result.assets_updated}</span></div>
+                  )}
+                  {result.locations_synced !== undefined && (
+                    <div>Locations synced: <span className="font-medium">{result.locations_synced}</span></div>
+                  )}
+                  {result.details?.total_records && (
+                    <div>Total records from Oracle: <span className="font-medium">{result.details.total_records}</span></div>
+                  )}
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-2"
+                  onClick={() => setCurrentTaskId(null)}
+                >
+                  Close
+                </Button>
+              </div>
+            )}
+            
+            {status === 'FAILURE' && error && (
+              <div className="mt-4 p-3 bg-red-100 border border-red-200 rounded">
+                <div className="text-sm text-red-800">
+                  <div className="font-medium">Task failed!</div>
+                  <div>{error}</div>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-2"
+                  onClick={() => setCurrentTaskId(null)}
+                >
+                  Close
+                </Button>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
   };
 
   return (
@@ -91,6 +246,9 @@ export const ERPScheduling = () => {
           Test Connection
         </Button>
       </div>
+
+      {/* Task Progress */}
+      {renderTaskProgress()}
 
       {/* Sync Configuration Overview */}
       <Card>
@@ -121,33 +279,33 @@ export const ERPScheduling = () => {
                 <div className="text-sm text-muted-foreground">Total Locations</div>
               </div>
               <div className="text-center">
-                                    <div className="text-sm font-medium">
-                      {syncConfig.last_asset_sync ? 
-                        (() => {
-                          try {
-                            return format(new Date(syncConfig.last_asset_sync), 'MMM dd, yyyy HH:mm');
-                          } catch {
-                            return 'Invalid Date';
-                          }
-                        })() : 
-                        'Never'
+                <div className="text-sm font-medium">
+                  {syncConfig.last_asset_sync ? 
+                    (() => {
+                      try {
+                        return format(new Date(syncConfig.last_asset_sync), 'MMM dd, yyyy HH:mm');
+                      } catch {
+                        return 'Invalid Date';
                       }
-                    </div>
+                    })() : 
+                    'Never'
+                  }
+                </div>
                 <div className="text-sm text-muted-foreground">Last Asset Sync</div>
               </div>
               <div className="text-center">
-                                    <div className="text-sm font-medium">
-                      {syncConfig.last_location_sync ? 
-                        (() => {
-                          try {
-                            return format(new Date(syncConfig.last_location_sync), 'MMM dd, yyyy HH:mm');
-                          } catch {
-                            return 'Invalid Date';
-                          }
-                        })() : 
-                        'Never'
+                <div className="text-sm font-medium">
+                  {syncConfig.last_location_sync ? 
+                    (() => {
+                      try {
+                        return format(new Date(syncConfig.last_location_sync), 'MMM dd, yyyy HH:mm');
+                      } catch {
+                        return 'Invalid Date';
                       }
-                    </div>
+                    })() : 
+                    'Never'
+                  }
+                </div>
                 <div className="text-sm text-muted-foreground">Last Location Sync</div>
               </div>
             </div>
@@ -167,7 +325,7 @@ export const ERPScheduling = () => {
               <Database className="h-5 w-5" />
               <span>Asset Sync</span>
             </CardTitle>
-            <CardDescription>Synchronize assets from Oracle ERP</CardDescription>
+            <CardDescription>Synchronize assets from Oracle ERP (Background Task)</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center space-x-2">
@@ -184,7 +342,7 @@ export const ERPScheduling = () => {
             </div>
             <Button
               onClick={handleAssetSync}
-              disabled={syncAssets.isPending}
+              disabled={syncAssets.isPending || (currentTaskId && taskStatus?.status === 'PENDING')}
               className="w-full"
             >
               {syncAssets.isPending ? (
@@ -192,7 +350,7 @@ export const ERPScheduling = () => {
               ) : (
                 <Play className="h-4 w-4 mr-2" />
               )}
-              Sync Assets
+              Start Asset Sync
             </Button>
           </CardContent>
         </Card>
@@ -203,12 +361,12 @@ export const ERPScheduling = () => {
               <MapPin className="h-5 w-5" />
               <span>Location Sync</span>
             </CardTitle>
-            <CardDescription>Synchronize locations from Oracle ERP</CardDescription>
+            <CardDescription>Synchronize locations from Oracle ERP (Background Task)</CardDescription>
           </CardHeader>
           <CardContent>
             <Button
               onClick={handleLocationSync}
-              disabled={syncLocations.isPending}
+              disabled={syncLocations.isPending || (currentTaskId && taskStatus?.status === 'PENDING')}
               className="w-full"
             >
               {syncLocations.isPending ? (
@@ -216,7 +374,7 @@ export const ERPScheduling = () => {
               ) : (
                 <RefreshCw className="h-4 w-4 mr-2" />
               )}
-              Sync Locations
+              Start Location Sync
             </Button>
           </CardContent>
         </Card>
