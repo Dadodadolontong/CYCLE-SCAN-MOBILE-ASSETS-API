@@ -107,9 +107,9 @@ class ERPIntegrationService:
         
         cursor.execute(query)
         rows = cursor.fetchall()
+        
         try:
             for row in rows:
-                
                 existing_location = self.db.query(Location).filter(Location.erp_location_id == row[2]).first()
                 branch_id = self.db.query(Branch).filter(Branch.name == row[3]).first()
             
@@ -121,7 +121,6 @@ class ERPIntegrationService:
                         existing_location.branch_id = branch_id.id
                     existing_location.updated_at = datetime.utcnow()
                     existing_location.synced_at = datetime.utcnow()
-                    self.db.commit()
                     logger.info(f"Updated location with ERP ID: {row[2]}")
                 else:
                     # Create new location
@@ -130,13 +129,16 @@ class ERPIntegrationService:
                         name=row[0],
                         description=row[1],
                         erp_location_id=row[2],
-                        branch_id=branch_id.id
+                        branch_id=branch_id.id if branch_id else None
                     )
-                    self.db.add(new_location)   
+                    self.db.add(new_location)
+                    logger.info(f"Created new location with ERP ID: {row[2]}")
 
         except Exception as e:
             logger.error(f"Error updating location: {str(e)}")
             self.db.rollback()
+            cursor.close()
+            connection.close()
             return ERPAssetResponse(
                 success=False,
                 message=f"Error updating location: {str(e)}",
@@ -144,6 +146,8 @@ class ERPIntegrationService:
             )
             
         self.db.commit()
+        cursor.close()
+        connection.close()
         logger.info(f"Successfully synced {len(rows)} locations from Oracle ERP")
         return ERPAssetResponse(
             success=True,

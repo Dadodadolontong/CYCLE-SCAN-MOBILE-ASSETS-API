@@ -282,9 +282,9 @@ def sync_locations_from_oracle_task(self, user_id: str = None):
         # Update sync log with success
         erp_service.update_sync_log_success(
             sync_log.id,
-            result.get("locations_synced", 0),
-            len(result.get("errors", [])),
-            result.get("errors") if result.get("errors") else None
+            result.locations_synced,
+            len(result.errors),
+            result.errors if result.errors else None
         )
         
         # Final task state
@@ -295,7 +295,7 @@ def sync_locations_from_oracle_task(self, user_id: str = None):
                 "sync_log_id": sync_log.id,
                 "status": "completed",
                 "message": f"Successfully synced locations",
-                "locations_synced": result.get("locations_synced", 0),
+                "locations_synced": result.locations_synced,
                 "completed_at": datetime.utcnow().isoformat()
             }
         )
