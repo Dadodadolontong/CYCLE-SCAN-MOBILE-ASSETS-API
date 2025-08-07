@@ -83,7 +83,7 @@ serve(async (req) => {
       })
     }
 
-    console.log(`Starting ${syncType} asset sync for user ${user.id}`)
+    
 
     try {
       // Get ERP API configuration from environment
@@ -94,7 +94,6 @@ serve(async (req) => {
         throw new Error('ERP API configuration missing')
       }
 
-      console.log('Fetching assets from ERP API...')
       
       // Call ERP API to get assets
       const erpResponse = await fetch(`${erpApiUrl}/assets`, {
@@ -110,8 +109,7 @@ serve(async (req) => {
       }
 
       const erpAssets: ERPAsset[] = await erpResponse.json()
-      console.log(`Fetched ${erpAssets.length} assets from ERP`)
-
+    
       let assetsProcessed = 0
       let errorsCount = 0
       const errors: string[] = []
@@ -169,8 +167,7 @@ serve(async (req) => {
         })
         .eq('id', syncLog.id)
 
-      console.log(`Sync completed: ${assetsProcessed} assets processed, ${errorsCount} errors`)
-
+    
       return new Response(JSON.stringify({
         success: true,
         syncLogId: syncLog.id,

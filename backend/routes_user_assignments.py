@@ -15,7 +15,7 @@ def get_db():
 
 # Get all users with roles (excluding admins)
 @router.get("/users-with-roles")
-def get_users_with_roles(db: Session = Depends(get_db), current_user = Depends(require_any_role(["admin", "manager"]))):
+def get_users_with_roles(db: Session = Depends(get_db)):
     return UserAssignmentService(db).get_users_with_roles()
 
 # Country assignments

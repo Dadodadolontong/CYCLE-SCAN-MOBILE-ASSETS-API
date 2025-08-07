@@ -440,3 +440,12 @@ class LocationService:
             self.db.rollback()
             raise HTTPException(status_code=400, detail='Failed to delete location')
         return {'ok': True, 'id': location_id} 
+    
+    def count_locations(self, user_id: Optional[str] = None) -> Dict[str, Any]:
+        q = self.db.query(Location)
+        if user_id:
+            scope = get_access_scope_for_user(self.db, user_id)
+            if not scope['is_admin']:
+                allowed_ids = set(scope['location_ids'])
+                q = q.filter(Location.id.in_(allowed_ids))
+        return {'count': q.count()}

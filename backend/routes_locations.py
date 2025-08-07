@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, Body
 from sqlalchemy.orm import Session
 from db import SessionLocal
 from services.location_service import LocationService
@@ -156,3 +156,11 @@ def delete_location(
     current_user = Depends(require_role("admin"))
 ):
     return LocationService(db).delete_location(location_id) 
+
+@router.get("/count")
+def count_locations(    
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    return LocationService(db).count_locations(user_id=current_user.id)
+    

@@ -7,27 +7,28 @@ import { useLocations } from "@/hooks/useLocations";
 import { fastapiClient } from '@/integrations/fastapi/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
-export function useAssetCount(location, category) {
+export function useAssetCount(location: string | undefined, category: string | undefined) {
   return useQuery({
     queryKey: ['asset-count', location, category],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (location) params.append('location', location);
       if (category) params.append('category', category);
-      const data = await fastapiClient.get(`/assets/count?${params.toString()}`);
+      const data = await fastapiClient.get<{ count: number }>(`/assets/count?${params.toString()}`);
       return data.count;
     }
   });
 }
 
 export const useCycleCountLogic = (taskId: string | undefined) => {
-  const { data: tempAssets = [] } = useTempAssets();
-  const { data: cycleCountItems = [] } = useCycleCountItems(taskId);
-  const { data: locations = [] } = useLocations();
+  const { data: tempAssets = [], isLoading: tempAssetsLoading } = useTempAssets();
+  const { data: cycleCountItems = [], isLoading: cycleCountItemsLoading } = useCycleCountItems(taskId);
+  const { data: locationsData = { items: [], total: 0 }, isLoading: locationsLoading } = useLocations();
+  const locations = locationsData.items || [];
   const createCycleCountItem = useCreateCycleCountItem();
   const createTempAsset = useCreateTempAsset();
   const updateTask = useUpdateCycleCountTask();
-  const { data: currentTask } = useCycleCountTaskById(taskId);
+  const { data: currentTask, isLoading: taskLoading } = useCycleCountTaskById(taskId);
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [showScanner, setShowScanner] = useState(false);
@@ -109,20 +110,25 @@ export const useCycleCountLogic = (taskId: string | undefined) => {
         createCycleCountItem.mutate({
           task_id: taskId!,
           asset_id: asset.id,
-          actual_location: currentTaskLocation === 'All locations' ? null : currentTaskLocation,
-          expected_location: assetLocation.name,
+          expected_location: assetLocation?.name,
+          actual_location: currentTaskLocation,
           status: 'counted',
-          counted_by: currentUserId,
-          counted_at: new Date().toISOString(),
         }, {
           onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['cycle_count_items', taskId] });
-          }
-        });
-        toast({
-          title: "Asset Counted",
-          description: `${asset.name} has been successfully counted.`,
-          variant: "default",
+            toast({
+              title: "Asset Counted",
+              description: `${asset.name} has been counted successfully.`,
+              variant: "default",
+            });
+          },
+          onError: (error) => {
+            toast({
+              title: "Error Counting Asset",
+              description: "Failed to count the asset. Please try again.",
+              variant: "destructive",
+            });
+          },
         });
       }
     } else {
@@ -160,9 +166,10 @@ export const useCycleCountLogic = (taskId: string | undefined) => {
       description: data.description,
       model: data.model || undefined,
       build: data.build || undefined,
-      location_id: currentTask?.location_filter || null,
+      location: currentTask?.location_filter || null,
       barcode: tempTagNumber,
       cycle_count_task_id: currentTask?.id || null,
+      created_by: currentUserId,
     }, {
       onSuccess: () => {
         toast({
@@ -212,7 +219,7 @@ export const useCycleCountLogic = (taskId: string | undefined) => {
     showCompletionSummary,
     currentTask,
     currentTaskLocation,
-    isLoading: false,
+    isLoading: taskLoading || tempAssetsLoading || cycleCountItemsLoading || locationsLoading,
     scannedItems: cycleCountItems || [],
     hasStarted,
     handleScanSuccess,

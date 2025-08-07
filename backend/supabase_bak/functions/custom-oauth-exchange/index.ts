@@ -23,9 +23,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('Custom OAuth exchange started - v2.0');
-    console.log('Request method:', req.method);
-    console.log('Request URL:', req.url);
+    
     
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -46,8 +44,7 @@ Deno.serve(async (req) => {
     }
 
     const { code, config }: TokenExchangeRequest = requestBody;
-    console.log('Received request with code:', code ? 'present' : 'missing');
-    console.log('Config provided:', config ? 'present' : 'missing');
+    
 
     if (!code || !config) {
       throw new Error('Missing required parameters: code or config');
@@ -57,7 +54,7 @@ Deno.serve(async (req) => {
       throw new Error('Missing required config parameters');
     }
 
-    console.log('Exchanging OAuth code for tokens...');
+    
 
     // Exchange authorization code for access token
     // For DexanPassport, the API key is embedded in the tokenUrl
@@ -86,7 +83,7 @@ Deno.serve(async (req) => {
       throw new Error('No access token received');
     }
 
-    console.log('Successfully received tokens, fetching user info...');
+    
 
     // Fetch user information using the access token
     const userResponse = await fetch(config.userInfoUrl, {
@@ -101,7 +98,7 @@ Deno.serve(async (req) => {
     }
 
     const userData = await userResponse.json();
-    console.log('User data received:', { id: userData.id, email: userData.email });
+    
 
     // First try to find existing user by email
     const { data: users } = await supabase.auth.admin.listUsers();
@@ -110,7 +107,7 @@ Deno.serve(async (req) => {
 
     if (!user) {
       // User doesn't exist, create new user
-      console.log('Creating new user with guest role...');
+    
       isNewUser = true;
       
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
@@ -144,19 +141,8 @@ Deno.serve(async (req) => {
           role: 'guest'
         });
 
-      if (roleError) {
-        console.error('Error assigning guest role:', roleError);
-        // Don't throw error here as user is created, just log it
-      } else {
-        console.log('Guest role assigned to new user');
-      }
-    } else {
-      console.log('Found existing user:', user.email);
-    }
-
-    // Generate session tokens using temporary password approach
-    console.log('Generating session tokens for user:', user.id);
-    
+      
+    } 
     // Generate a temporary password
     const tempPassword = crypto.randomUUID();
     
@@ -165,8 +151,7 @@ Deno.serve(async (req) => {
       password: tempPassword
     });
 
-    if (updateError) {
-      console.error('Failed to update user password:', updateError);
+    if (updateError) {      
       throw new Error('Failed to prepare user for authentication');
     }
 
@@ -176,17 +161,14 @@ Deno.serve(async (req) => {
       password: tempPassword
     });
 
-    if (signInError || !signInData.session) {
-      console.error('Failed to sign in with temporary password:', signInError);
+    if (signInError || !signInData.session) {     
       throw new Error('Failed to generate session tokens');
     }
 
     const accessToken = signInData.session.access_token;
     const refreshToken = signInData.session.refresh_token;
 
-    console.log('Session tokens generated successfully');
-
-    console.log('OAuth exchange completed successfully');
+    
 
     return new Response(
       JSON.stringify({

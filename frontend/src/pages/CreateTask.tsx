@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocations } from "@/hooks/useLocations";
 import { useCategories } from "@/hooks/useCategories";
 import { useCreateCycleCountTask, useCycleCountTaskById, useUpdateCycleCountTask } from "@/hooks/useCycleCountTasks";
-import { useAssets } from "@/hooks/useAssets";
+import { useAssets, useAssetCountByLocation } from "@/hooks/useAssets";
 import { useAuth } from "@/contexts/FastAPIAuthContext";
 import { useProfiles } from "@/hooks/useProfiles";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -25,7 +25,8 @@ const CreateTask = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const { data: userRole, isLoading: userRoleLoading } = useUserRole();
-  const { data: locations = [], isLoading: locationsLoading } = useLocations();
+  const { data: locationsData = { items: [], total: 0 }, isLoading: locationsLoading } = useLocations();
+  const locations = locationsData.items || [];
   const { data: categories = [], isLoading: categoriesLoading } = useCategories();
   const { data: assets = [], isLoading: assetsLoading } = useAssets();
   const { data: profiles = [], isLoading: profilesLoading } = useProfiles();
@@ -33,12 +34,13 @@ const CreateTask = () => {
   const updateTask = useUpdateCycleCountTask();
   const { data: existingTask } = useCycleCountTaskById(taskId);
   // Add these hooks at the top
-  const { data: branches = [], isLoading: branchesLoading } = useBranches();
+  const { data: branchesData = { items: [], total: 0 }, isLoading: branchesLoading } = useBranches();
+  const branches = branchesData.items || [];
   const { data: regions = [], isLoading: regionsLoading } = useRegions();
   const { data: branchAssignments = [], isLoading: branchAssignmentsLoading } = useAllBranchAssignments();
   const { data: regionAssignments = [], isLoading: regionAssignmentsLoading } = useAllRegionAssignments();
   const { data: countryAssignments = [], isLoading: countryAssignmentsLoading } = useAllCountryAssignments();
-  const { data: usersWithRoles = [] } = useUsersWithRoles();
+  const { data: usersWithRoles = [], isLoading: usersWithRolesLoading } = useUsersWithRoles();
   
   const isEditMode = !!taskId;
   
@@ -48,6 +50,10 @@ const CreateTask = () => {
     locationFilter: '',
     assignedTo: user?.id || '',
   });
+
+  // Get the selected location ID for asset counting - moved after formData is defined
+  const selectedLocationForCount = locations.find(loc => loc.name === formData.locationFilter);
+  const { data: assetCount = 0, isLoading: assetCountLoading } = useAssetCountByLocation(selectedLocationForCount?.id);
 
   // Set default assigned user when user loads, or populate with existing task data
   useEffect(() => {
@@ -98,7 +104,7 @@ const CreateTask = () => {
     );
   }
 
-  if (branchesLoading || locationsLoading || branchAssignmentsLoading || regionAssignmentsLoading || countryAssignmentsLoading) {
+  if (branchesLoading || locationsLoading || categoriesLoading || assetsLoading || assetCountLoading || profilesLoading || regionsLoading || branchAssignmentsLoading || regionAssignmentsLoading || countryAssignmentsLoading || usersWithRolesLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
@@ -110,19 +116,13 @@ const CreateTask = () => {
   }
 
   const getEstimatedAssetCount = () => {
-    let filteredAssets = assets;
-    
     if (formData.locationFilter && formData.locationFilter !== 'all') {
-      // Find the location ID for the selected location name
-      const selectedLocation = locations.find(loc => loc.name === formData.locationFilter);
-      if (selectedLocation) {
-        filteredAssets = filteredAssets.filter(asset => 
-          asset.location === selectedLocation.id
-        );
-      }
+      // Use the accurate count from the backend for specific location
+      return assetCount;
     }
     
-    return filteredAssets.length;
+    // If no location filter or 'all' selected, return total assets count from backend
+    return assetCount;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -207,7 +207,7 @@ const CreateTask = () => {
   const selectedLocation = locations.find(loc => loc.name === formData.locationFilter);
   let assignableUsers = usersWithRoles;
 
-  const selectedUser = profiles.find(profile => profile.id === formData.assignedTo);
+  const selectedUser = usersWithRoles.find(user => user.id === formData.assignedTo);
   const estimatedAssets = getEstimatedAssetCount();
 
   return (
@@ -312,7 +312,7 @@ const CreateTask = () => {
                 <SelectContent>
                     {assignableUsers.map((user) => (
                     <SelectItem key={user.id} value={user.id}>
-                      {user.display_name || profiles.find(p => p.id === user.id)?.email || 'Unnamed User'} - {user.role}
+                      {user.display_name || 'Unnamed User'} - {user.role}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -325,6 +325,7 @@ const CreateTask = () => {
                 <div className="mt-2 p-3 bg-muted rounded-md">
                   <div className="text-sm text-muted-foreground">
                     <div><strong>Assigned to:</strong> {selectedUser.display_name || 'Unnamed User'}</div>
+                    <div><strong>Role:</strong> {selectedUser.role}</div>
                   </div>
                 </div>
               )}
@@ -356,7 +357,7 @@ const CreateTask = () => {
                   <div><strong>Name:</strong> {formData.name}</div>
                   {formData.description && <div><strong>Description:</strong> {formData.description}</div>}
                   <div><strong>Location Filter:</strong> {formData.locationFilter || 'None selected'}</div>              
-                  <div><strong>Assigned to:</strong> {selectedUser?.display_name || selectedUser?.email || profiles.find(p => p.id === selectedUser?.id)?.email || 'Unassigned'}</div>
+                  <div><strong>Assigned to:</strong> {selectedUser?.display_name || 'Unassigned'}</div>
                   <div><strong>Estimated Assets:</strong> {estimatedAssets}</div>
                   <div><strong>Status:</strong> Draft (can be activated later)</div>
                 </div>

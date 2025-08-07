@@ -16,7 +16,7 @@ import { useAssets } from "@/hooks/useAssets";
 import { useLocations } from "@/hooks/useLocations";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useProfiles } from "@/hooks/useProfiles";
+import { useUsersWithRoles } from "@/hooks/useUserAssignments";
 
 interface CycleCountItemWithAsset extends Record<string, any> {
   id: string;
@@ -50,8 +50,7 @@ const CycleCount = () => {
     currentTaskLocation,
     isLoading,
     scannedItems,
-    scannedAssets,
-    filteredScannedAssets,
+
     hasStarted,
     handleScanSuccess,
     handleManualEntry,
@@ -62,24 +61,21 @@ const CycleCount = () => {
     tempAssets,
   } = useCycleCountLogic(taskId);
 
-  const locationId = currentTask?.location_filter || undefined;
-  const category = currentTask && 'category_filter' in currentTask ? currentTask.category_filter : undefined;
+  const locationId = currentTask?.location_filter;
+  const category = currentTask && 'category_filter' in currentTask ? String(currentTask.category_filter) : undefined;
   const { data: totalAssetCount = 0 } = useAssetCount(locationId, category);
 
-  const { data: allAssets = [] } = useAssets();
-  const { data: locations = [] } = useLocations();
+  const { data: locationsData = { items: [], total: 0 } } = useLocations();
+  const locations = locationsData.items || [];
   const locationIdToName = Object.fromEntries(locations.map(loc => [loc.id, loc.name]));
-  // Filter all assets for the current task's location/category
-  let allAssetsInScope = allAssets;
-  if (currentTask?.location_filter) {
-    allAssetsInScope = allAssetsInScope.filter(asset => asset.location === currentTask.location_filter);
-  }
-  if (currentTask?.category_filter) {
-    allAssetsInScope = allAssetsInScope.filter(asset => asset.category === currentTask.category_filter);
-  }
 
   const [page, setPage] = useState(1);
-  const pageSize = 5;
+  const pageSize = 20;
+
+  const [countedPage, setCountedPage] = useState(1);
+  const [missingPage, setMissingPage] = useState(1);
+  const [temporaryPage, setTemporaryPage] = useState(1);
+  const itemsPerPage = 20;
 
   // No need to join asset details in the frontend; backend now provides 'asset' in each scannedItem
   const scannedItemsWithAssets: CycleCountItemWithAsset[] = scannedItems as unknown as CycleCountItemWithAsset[]; // Already includes asset
@@ -93,13 +89,13 @@ const CycleCount = () => {
 
   // Filter temp assets for this task
   const filteredTempAssets = tempAssets.filter(
-    asset => asset.cycle_count_task_id === currentTask.id
+    asset => asset.cycle_count_task_id === currentTask?.id
   );
 
   const navigate = useNavigate();
-  const { data: profiles = [] } = useProfiles();
-  const assignedProfile = profiles.find(p => p.id === currentTask.assigned_to);
-  const assignedToName = assignedProfile?.display_name || "";
+  const { data: usersWithRoles = [] } = useUsersWithRoles();
+  const assignedUser = usersWithRoles.find(user => user.id === currentTask?.assigned_to);
+  const assignedToName = assignedUser?.display_name || undefined;
 
   if (isLoading || !currentTask) {
     return (
@@ -124,33 +120,36 @@ const CycleCount = () => {
   }
 
   if (showCompletionSummary || currentTask.status === 'completed') {
-    // 1. Get all assets that should be counted (you may need to fetch them for the task's location/category)
-    // For now, let's assume you have a list of all assets in scope as `allAssetsInScope`
-    // (You may need to use useAssets() and filter by location/category)
 
     // 2. Build countedAssets with location mismatch tagging
-    const countedAssets = scannedItemsWithAssets.map(item => ({
-      id: item.asset?.id || '',
-      name: item.asset?.name || 'Unknown Asset',
-      barcode: item.asset?.barcode || null,
-      // Use location name if available, else fallback to ID
-      location: item.actual_location ? (locationIdToName[item.actual_location] || item.actual_location) : null,
-      category: item.asset?.category || null,
-      status: 'counted' as const,
-      last_seen: item.asset?.last_seen || null,
-      hasLocationMismatch: item.expected_location !== item.actual_location,
-      expectedLocation: item.expected_location
-    }));
-
-    // 3. Compute missing assets
-    const countedAssetIds = new Set(scannedItemsWithAssets.map(item => item.asset?.id));
-    const missingAssets = allAssetsInScope
-      .filter(asset => !countedAssetIds.has(asset.id))
-      .map(asset => ({
-        ...asset,
-        status: 'missing' as const,
-        location: asset.location ? (locationIdToName[asset.location] || asset.location) : null,
+    const countedAssets = scannedItemsWithAssets
+      .filter(item => item.status === 'counted') // Only include actually counted items
+      .map(item => ({
+        id: item.asset?.id || '',
+        name: item.asset?.name || 'Unknown Asset',
+        barcode: item.asset?.barcode || null,
+        location: item.actual_location ? (locationIdToName[item.actual_location] || item.actual_location) : null,
+        category: item.asset?.category || null,
+        status: 'counted' as const,
+        last_seen: item.asset?.last_seen || null,
+        hasLocationMismatch: item.expected_location !== item.actual_location,
+        expectedLocation: item.expected_location
       }));
+
+    // 3. Build missingAssets from scannedItemsWithAssets with status === 'missing'
+    const missingAssets = scannedItemsWithAssets
+      .filter(item => item.status === 'missing') // Only include items marked as missing
+      .map(item => ({
+        id: item.asset?.id || '',
+        name: item.asset?.name || 'Unknown Asset',
+        barcode: item.asset?.barcode || null,
+        location: item.expected_location ? (locationIdToName[item.expected_location] || item.expected_location) : null,
+        category: item.asset?.category || null,
+        status: 'missing' as const,
+        last_seen: item.asset?.last_seen || null,
+        expectedLocation: item.expected_location
+      }));
+    
 
     // 4. Use filteredTempAssets for tempAssets, mapping location to name
     const tempAssetsWithLocationName = filteredTempAssets.map(asset => ({
@@ -159,6 +158,24 @@ const CycleCount = () => {
       name: asset.description, // for AssetList compatibility
       category: 'Temporary',
     }));
+
+    // Paginate each category
+    const paginatedCountedAssets = countedAssets.slice(
+      (countedPage - 1) * itemsPerPage,
+      countedPage * itemsPerPage
+    );
+
+    const paginatedMissingAssets = missingAssets.slice(
+      (missingPage - 1) * itemsPerPage,
+      missingPage * itemsPerPage
+    );
+
+    const paginatedTempAssets = tempAssetsWithLocationName.slice(
+      (temporaryPage - 1) * itemsPerPage,
+      temporaryPage * itemsPerPage
+    );
+
+
 
     const handleExportToCSV = () => {
       const startDate = currentTask.started_at ? new Date(currentTask.started_at).toLocaleString() : "";
@@ -239,7 +256,7 @@ const CycleCount = () => {
             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
               <div><strong>Location:</strong> {currentTaskLocation}</div>
               <div><strong>Status:</strong> {currentTask.status}</div>
-              {currentTask.category_filter && <div><strong>Category:</strong> {currentTask.category_filter}</div>}
+                {currentTask && 'category_filter' in currentTask && <div><strong>Category:</strong> {String(currentTask.category_filter)}</div>}
             </div>
           </div>
           <Tabs defaultValue="counted" className="w-full mt-6">
@@ -248,14 +265,80 @@ const CycleCount = () => {
               <TabsTrigger value="missing">Missing ({missingAssets.length})</TabsTrigger>
               <TabsTrigger value="temporary">Temporary ({tempAssetsWithLocationName.length})</TabsTrigger>
             </TabsList>
+            
             <TabsContent value="counted" className="mt-4">
-              <AssetList assets={countedAssets} onAssetToggle={() => {}} />
+              <AssetList assets={paginatedCountedAssets} onAssetToggle={() => {}} />
+              <div className="flex justify-end mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={countedPage === 1}
+                  onClick={() => setCountedPage(countedPage - 1)}
+                >
+                  Previous
+                </Button>
+                <span className="mx-2 flex items-center">
+                  Page {countedPage} of {Math.ceil(countedAssets.length / itemsPerPage)}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={countedPage * itemsPerPage >= countedAssets.length}
+                  onClick={() => setCountedPage(countedPage + 1)}
+                >
+                  Next
+                </Button>
+              </div>
             </TabsContent>
+            
             <TabsContent value="missing" className="mt-4">
-              <AssetList assets={missingAssets} onAssetToggle={() => {}} />
+              <AssetList assets={paginatedMissingAssets} onAssetToggle={() => {}} />
+              <div className="flex justify-end mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={missingPage === 1}
+                  onClick={() => setMissingPage(missingPage - 1)}
+                >
+                  Previous
+                </Button>
+                <span className="mx-2 flex items-center">
+                  Page {missingPage} of {Math.ceil(missingAssets.length / itemsPerPage)}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={missingPage * itemsPerPage >= missingAssets.length}
+                  onClick={() => setMissingPage(missingPage + 1)}
+                >
+                  Next
+                </Button>
+              </div>
             </TabsContent>
+            
             <TabsContent value="temporary" className="mt-4">
-              <AssetList assets={tempAssetsWithLocationName} onAssetToggle={() => {}} />
+              <AssetList assets={paginatedTempAssets} onAssetToggle={() => {}} />
+              <div className="flex justify-end mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={temporaryPage === 1}
+                  onClick={() => setTemporaryPage(temporaryPage - 1)}
+                >
+                  Previous
+                </Button>
+                <span className="mx-2 flex items-center">
+                  Page {temporaryPage} of {Math.ceil(tempAssetsWithLocationName.length / itemsPerPage)}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={temporaryPage * itemsPerPage >= tempAssetsWithLocationName.length}
+                  onClick={() => setTemporaryPage(temporaryPage + 1)}
+                >
+                  Next
+                </Button>
+              </div>
             </TabsContent>
           </Tabs>
         </div>
@@ -277,6 +360,7 @@ const CycleCount = () => {
           <CycleCountHeader
             taskName={currentTask.name}
             taskLocation={currentTaskLocation}
+            assignedToName={assignedToName}
             canComplete={canComplete}
             onComplete={handleCompleteTask}
           />

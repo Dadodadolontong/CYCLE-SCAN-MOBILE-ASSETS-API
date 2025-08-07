@@ -24,6 +24,21 @@ export const useAssets = () => {
   });
 };
 
+export const useAssetCountByLocation = (locationId?: string) => {
+  return useQuery({
+    queryKey: ['asset-count', locationId],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (locationId) {
+        params.append('location', locationId);
+      }
+      const data = await fastapiClient.get<{ count: number }>(`/assets/count?${params.toString()}`);
+      return data.count;
+    },
+    enabled: true, // Always enabled to get total count when no location is selected
+  });
+};
+
 export const useUpdateAssetStatus = () => {
   const queryClient = useQueryClient();
   

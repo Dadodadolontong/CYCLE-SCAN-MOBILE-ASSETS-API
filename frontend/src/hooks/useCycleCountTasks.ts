@@ -20,6 +20,8 @@ export interface CycleCountItem {
   task_id: string;
   asset_id: string;
   status: string;
+  expected_location: string;
+  actual_location: string;
   scanned_at?: string;
   created_at: string;
   updated_at: string;

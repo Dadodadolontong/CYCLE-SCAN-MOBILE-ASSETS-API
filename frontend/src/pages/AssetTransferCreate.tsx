@@ -9,7 +9,8 @@ import { fastapiClient } from "@/integrations/fastapi/client";
 
 const AssetTransferCreate = () => {
   const navigate = useNavigate();
-  const { data: locations = [] } = useLocations();
+  const { data: locationsData = { items: [], total: 0 } } = useLocations();
+  const locations = locationsData.items || [];
   const [sourceLocation, setSourceLocation] = useState("");
   const [destinationLocation, setDestinationLocation] = useState("");
   const [barcodeInput, setBarcodeInput] = useState("");
@@ -29,6 +30,17 @@ const AssetTransferCreate = () => {
       try {
         // Fetch asset by barcode
         const asset = await fastapiClient.get<any>(`/assets/barcode/${encodeURIComponent(barcodeInput)}`);
+        // Check for location mismatch
+        if (sourceLocation && asset.location !== sourceLocation) {
+          // Find the asset's location name for better error message
+          const assetLocationName = locations.find(loc => loc.id === asset.location)?.name || asset.location;
+          const sourceLocationName = locations.find(loc => loc.id === sourceLocation)?.name || sourceLocation;
+          
+          setAssetError(`Location mismatch! Asset "${asset.name}" is located at "${assetLocationName}" but you're scanning from "${sourceLocationName}". Please verify the asset location.`);
+          setLoadingAsset(false);
+          return;
+        }
+        
         setAssetBarcodes([...assetBarcodes, barcodeInput]);
         setScannedAssets([...scannedAssets, { barcode: barcodeInput, name: asset.name || "Unknown Asset" }]);
         setBarcodeInput("");
@@ -38,7 +50,7 @@ const AssetTransferCreate = () => {
         setLoadingAsset(false);
       }
     }
-  };
+};
 
   const handleRemoveBarcode = (barcode: string) => {
     setAssetBarcodes(assetBarcodes.filter(b => b !== barcode));

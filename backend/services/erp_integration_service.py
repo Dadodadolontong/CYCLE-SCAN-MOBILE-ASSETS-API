@@ -103,6 +103,8 @@ class ERPIntegrationService:
                 segment3              as branchname
             FROM
                 fa_locations_kfv fl
+            WHERE 
+                fl.enabled = 'Y'
         """
         
         cursor.execute(query)
@@ -250,6 +252,11 @@ class ERPIntegrationService:
                 AND fd.date_ineffective IS NULL
                 AND fa.last_update_date > :last_sync_date
                 AND fa.tag_number is not null 
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM FA_RETIREMENTS a
+                    WHERE a.asset_id = fa.asset_id
+                )
                 ORDER BY fa.asset_id
             """
             

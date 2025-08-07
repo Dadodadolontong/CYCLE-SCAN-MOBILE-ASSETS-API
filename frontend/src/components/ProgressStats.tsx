@@ -48,7 +48,7 @@ const ProgressStats = ({ scannedItems, totalExpectedAssets = 0 }: ProgressStatsP
         </CardContent>
       </Card>
 
-      <Card>
+      {/* <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Progress</CardTitle>
         </CardHeader>
@@ -61,7 +61,7 @@ const ProgressStats = ({ scannedItems, totalExpectedAssets = 0 }: ProgressStatsP
             />
           </div>
         </CardContent>
-      </Card>
+      </Card> */}
     </div>
   );
 };

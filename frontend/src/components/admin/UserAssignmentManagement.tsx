@@ -373,7 +373,7 @@ export const UserAssignmentManagement = () => {
                       <SelectValue placeholder="Select branch" />
                     </SelectTrigger>
                     <SelectContent>
-                      {branches?.map((branch) => (
+                      {branches?.items.map((branch) => (
                         <SelectItem key={branch.id} value={branch.id}>
                           {branch.name} ({branch.region?.name})
                         </SelectItem>

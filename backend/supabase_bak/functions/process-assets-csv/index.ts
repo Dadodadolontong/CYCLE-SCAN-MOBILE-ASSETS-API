@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
       throw new Error('Invalid filename format');
     }
 
-    console.log('Processing assets CSV file:', fileName);
+    
     await createSecurityLog(supabase, 'csv_processing_started', { 
       fileName, 
       userId: user.id, 
@@ -173,7 +173,7 @@ Deno.serve(async (req) => {
     }
 
     const locationMap = new Map(locations.map(loc => [loc.name.toLowerCase(), loc.id]));
-    console.log(`Loaded ${locations.length} locations for lookup`);
+    
 
     // Parse CSV content with streaming for large files
     const csvText = await fileData.text();
@@ -190,7 +190,7 @@ Deno.serve(async (req) => {
 
     const headers = lines[0].split(',').map(h => sanitizeCsvCell(h.trim().replace(/"/g, '')));
     
-    console.log('CSV headers:', headers);
+    
 
     // Validate headers
     const expectedHeaders = ['name', 'erp_asset_id', 'location-name'];
@@ -203,20 +203,14 @@ Deno.serve(async (req) => {
     const errors: string[] = [];
 
     // Process each row with enhanced validation and detailed logging
-    console.log(`Total lines in CSV: ${lines.length - 1} (excluding header)`);
+    
     
     for (let i = 1; i < lines.length; i++) {
       try {
-        // Log progress every 1000 rows
-        if (i % 1000 === 0) {
-          console.log(`Processing row ${i}/${lines.length - 1}`);
-        }
+    
         
         const line = lines[i].trim();
-        if (!line) {
-          console.log(`Skipping empty row ${i + 1}`);
-          continue;
-        }
+    
         
         // Enhanced CSV parsing to handle quoted fields and commas within fields
         const values = [];
@@ -240,7 +234,6 @@ Deno.serve(async (req) => {
         // Check if we have the right number of columns
         if (values.length !== headers.length) {
           errors.push(`Row ${i + 1}: Expected ${headers.length} columns, got ${values.length}. Line content: "${line.substring(0, 100)}..."`);
-          console.log(`Row ${i + 1} column mismatch: expected ${headers.length}, got ${values.length}`);
           continue;
         }
         
@@ -300,7 +293,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`Parsed ${assets.length} assets, ${errors.length} errors`);
+
 
     // Create sync log entry
     const { data: syncLog, error: syncLogError } = await supabase
@@ -347,14 +340,14 @@ Deno.serve(async (req) => {
     const batchSize = 50;
     let processedCount = 0;
     
-    console.log(`Processing ${assets.length} assets in batches of ${batchSize}`);
+
 
     for (let i = 0; i < assets.length; i += batchSize) {
       const batch = assets.slice(i, i + batchSize);
       const batchNumber = Math.floor(i / batchSize) + 1;
       const totalBatches = Math.ceil(assets.length / batchSize);
       
-      console.log(`Processing batch ${batchNumber}/${totalBatches}`);
+
       
       for (const asset of batch) {
         try {
@@ -444,7 +437,7 @@ Deno.serve(async (req) => {
       processingTimeMs: processingTime
     });
 
-    console.log(`Import completed: ${successCount} successful, ${errorCount} errors`);
+
 
     // Analyze error patterns
     const validationErrors = errors.filter(e => e.includes('contains invalid characters') || e.includes('too long'));
@@ -452,7 +445,6 @@ Deno.serve(async (req) => {
     const parsingErrors = errors.filter(e => e.includes('Parsing error') || e.includes('column mismatch'));
     const requiredFieldErrors = errors.filter(e => e.includes('is required'));
 
-    console.log(`Error breakdown: ${validationErrors.length} validation, ${locationErrors.length} location, ${parsingErrors.length} parsing, ${requiredFieldErrors.length} required field`);
 
     return new Response(
       JSON.stringify({

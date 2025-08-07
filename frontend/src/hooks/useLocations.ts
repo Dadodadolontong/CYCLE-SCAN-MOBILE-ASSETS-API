@@ -118,3 +118,18 @@ export const useDeleteLocation = () => {
     },
   });
 };
+
+export const useLocationCount = () => {
+  return useQuery({
+    queryKey: ['location-count'],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      params.append('skip', skip.toString());
+      params.append('limit', limit.toString());
+      
+      const data = await fastapiClient.get<{ count: number }>(`/locations/count`);
+      return data;
+    },
+  });
+};

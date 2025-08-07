@@ -82,5 +82,6 @@ def get_items_by_task(
     current_user = Depends(get_current_user)
 ):
     service = CycleCountItemService(db)
-    result = service.list_items(task_id=task_id)
+    # Get all items for the task without pagination limit
+    result = service.list_items(skip=0, limit=10000, task_id=task_id)
     return result["items"] 

@@ -5,11 +5,12 @@ import { useNavigate } from "react-router-dom";
 interface CycleCountHeaderProps {
   taskName: string;
   taskLocation: string;
+  assignedToName?: string;
   canComplete: boolean;
   onComplete: () => void;
 }
 
-const CycleCountHeader = ({ taskName, taskLocation, canComplete, onComplete }: CycleCountHeaderProps) => {
+const CycleCountHeader = ({ taskName, taskLocation, assignedToName, canComplete, onComplete }: CycleCountHeaderProps) => {
   const navigate = useNavigate();
 
   return (
@@ -27,7 +28,7 @@ const CycleCountHeader = ({ taskName, taskLocation, canComplete, onComplete }: C
         {taskName}
       </h1>
       <p className="text-muted-foreground">
-        Location: {taskLocation} • Scan barcodes to count assets
+        Location: {taskLocation} • Assigned to: {assignedToName || 'Unassigned'} • Scan barcodes to count assets
       </p>
 
       {canComplete && (

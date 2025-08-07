@@ -107,7 +107,7 @@ Deno.serve(async (req) => {
       throw new Error('Invalid filename format');
     }
 
-    console.log('Processing locations CSV file:', fileName);
+    
     await createSecurityLog(supabase, 'csv_processing_started', { 
       fileName, 
       userId: user.id, 
@@ -150,8 +150,7 @@ Deno.serve(async (req) => {
     }
 
     const branchMap = new Map(branches.map(branch => [branch.name.toLowerCase(), branch.id]));
-    console.log(`Loaded ${branches.length} branches for lookup`);
-
+    
     // Parse CSV content with streaming for large files
     const csvText = await fileData.text();
     
@@ -167,8 +166,7 @@ Deno.serve(async (req) => {
 
     const headers = lines[0].split(',').map(h => sanitizeCsvCell(h.trim().replace(/"/g, '')));
     
-    console.log('CSV headers:', headers);
-
+    
     // Validate headers - only 'name' is required
     const requiredHeaders = ['name'];
     const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
@@ -224,8 +222,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`Parsed ${locations.length} locations, ${errors.length} errors`);
-
+    
     // Create sync log entry
     const { data: syncLog, error: syncLogError } = await supabase
       .from('sync_logs')
@@ -326,8 +323,7 @@ Deno.serve(async (req) => {
       processingTimeMs: processingTime
     });
 
-    console.log(`Import completed: ${successCount} successful, ${errorCount} errors`);
-
+    
     return new Response(
       JSON.stringify({
         success: true,
