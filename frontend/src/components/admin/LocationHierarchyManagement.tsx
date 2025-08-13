@@ -16,6 +16,9 @@ import { useCountries, useCreateCountry, useUpdateCountry, useDeleteCountry } fr
 import { useRegions, useCreateRegion, useUpdateRegion, useDeleteRegion } from '@/hooks/useRegions';
 import { useBranches, useCreateBranch, useUpdateBranch, useDeleteBranch } from '@/hooks/useBranches';
 import { useLocations, useCreateLocation, useUpdateLocation, useDeleteLocation } from '@/hooks/useLocations';
+import { useUsersWithRoles } from '@/hooks/useUserAssignments';
+import { useCategories } from '@/hooks/useCategories';
+import { fastapiClient } from '@/integrations/fastapi/client';
 import { useLocationsByBranch } from '@/hooks/useLocations';
 
 export const LocationHierarchyManagement = () => {
@@ -89,6 +92,26 @@ export const LocationHierarchyManagement = () => {
   const [editingRegion, setEditingRegion] = useState<{ id: string; name: string; country_id: string } | null>(null);
   const [editingBranch, setEditingBranch] = useState<{ id: string; name: string; region_id: string } | null>(null);
   const [editingLocation, setEditingLocation] = useState<{ id: string; name: string; description: string; erp_location_id: string; branch_id: string } | null>(null);
+
+  // Assignment dialogs state
+  const { data: usersWithRoles = [] } = useUsersWithRoles();
+  const { data: categories = [] } = useCategories();
+  const [userSearch, setUserSearch] = useState('');
+  const filteredUsers = usersWithRoles
+    .filter((u: any) => u.role === 'user')
+    .filter((u: any) => {
+      const q = userSearch.trim().toLowerCase();
+      if (!q) return true;
+      return (
+        (u.display_name || '').toLowerCase().includes(q) ||
+        (u.role || '').toLowerCase().includes(q)
+      );
+    });
+  const [countryAssign, setCountryAssign] = useState<{ open: boolean; countryId: string | null; accountingManagerId: string | null; categoryId: string | null; recommendatorId: string | null }>({ open: false, countryId: null, accountingManagerId: null, categoryId: null, recommendatorId: null });
+  const [regionAssign, setRegionAssign] = useState<{ open: boolean; regionId: string | null; controllerId: string | null }>({ open: false, regionId: null, controllerId: null });
+  const [branchAssign, setBranchAssign] = useState<{ open: boolean; branchId: string | null; branchManagerId: string | null; financeManagerId: string | null }>({ open: false, branchId: null, branchManagerId: null, financeManagerId: null });
+  const [branchUserIds, setBranchUserIds] = useState<string[]>([]);
+  const [savingUsers, setSavingUsers] = useState(false);
 
   const handleCreateCountry = async () => {
     if (!newCountry.name || !newCountry.code) return;
@@ -284,7 +307,7 @@ export const LocationHierarchyManagement = () => {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Code</TableHead>
-                    <TableHead>Assigned Users</TableHead>
+                    <TableHead>Assignments</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -296,20 +319,15 @@ export const LocationHierarchyManagement = () => {
                         <Badge variant="outline">{country.code}</Badge>
                       </TableCell>
                       <TableCell>
-                        {country.assigned_users && country.assigned_users.length > 0 ? (
-                          <div className="space-y-1">
-                            {country.assigned_users.map((user) => (
-                              <div key={user.assignment_id} className="flex items-center gap-2 text-sm">
-                                <Badge variant="secondary" className="text-xs">
-                                  {user.role.replace('_', ' ')}
-                                </Badge>
-                                <span>{user.display_name || 'Unknown User'}</span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">No users assigned</span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setCountryAssign({ open: true, countryId: country.id, accountingManagerId: null, categoryId: null, recommendatorId: null })}
+                          >
+                            Manage Assignments
+                          </Button>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -375,6 +393,83 @@ export const LocationHierarchyManagement = () => {
                   ))}
                 </TableBody>
               </Table>
+              {/* Country assignments dialog */}
+              <Dialog open={countryAssign.open} onOpenChange={(open) => setCountryAssign(prev => ({ ...prev, open }))}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Country Assignments</DialogTitle>
+                    <DialogDescription>Set accounting manager and recommendators</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Accounting Manager</Label>
+                      <select
+                        className="border rounded p-2 w-full"
+                        value={countryAssign.accountingManagerId || ''}
+                        onChange={(e) => setCountryAssign(prev => ({ ...prev, accountingManagerId: e.target.value || null }))}
+                      >
+                        <option value="">Select accounting manager</option>
+                        {usersWithRoles.filter((u: any) => u.role === 'accounting_manager').map((u: any) => (
+                          <option key={u.id} value={u.id}>{u.display_name}</option>
+                        ))}
+                      </select>
+                      <div className="mt-2">
+                        <Button
+                          size="sm"
+                          onClick={async () => {
+                            if (!countryAssign.countryId) return;
+                            await fastapiClient.put(`/locations/countries/${countryAssign.countryId}`, { accounting_manager_id: countryAssign.accountingManagerId });
+                          }}
+                        >Save Accounting Manager</Button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3 items-end">
+                      <div>
+                        <Label>Category (optional)</Label>
+                        <select
+                          className="border rounded p-2 w-full"
+                          value={countryAssign.categoryId || ''}
+                          onChange={(e) => setCountryAssign(prev => ({ ...prev, categoryId: e.target.value || null }))}
+                        >
+                          <option value="">All categories (default)</option>
+                          {categories.map((c: any) => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <Label>Recommendator</Label>
+                        <select
+                          className="border rounded p-2 w-full"
+                          value={countryAssign.recommendatorId || ''}
+                          onChange={(e) => setCountryAssign(prev => ({ ...prev, recommendatorId: e.target.value || null }))}
+                        >
+                          <option value="">Select recommendator</option>
+                          {usersWithRoles.filter((u: any) => u.role === 'recommendator').map((u: any) => (
+                            <option key={u.id} value={u.id}>{u.display_name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <Button
+                          onClick={async () => {
+                            if (!countryAssign.countryId || !countryAssign.recommendatorId) return;
+                            await fastapiClient.post('/user-assignments/country-recommendators', {
+                              country_id: countryAssign.countryId,
+                              category_id: countryAssign.categoryId || null,
+                              user_id: countryAssign.recommendatorId,
+                              active: true,
+                            });
+                          }}
+                        >Save Recommendator</Button>
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setCountryAssign({ open: false, countryId: null, accountingManagerId: null, categoryId: null, recommendatorId: null })}>Close</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </CardContent>
           </Card>
         </TabsContent>
@@ -445,7 +540,7 @@ export const LocationHierarchyManagement = () => {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Country</TableHead>
-                    <TableHead>Assigned Users</TableHead>
+                    <TableHead>Assignments</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -455,20 +550,15 @@ export const LocationHierarchyManagement = () => {
                       <TableCell className="font-medium">{region.name}</TableCell>
                       <TableCell>{region.country?.name}</TableCell>
                       <TableCell>
-                        {region.assigned_users && region.assigned_users.length > 0 ? (
-                          <div className="space-y-1">
-                            {region.assigned_users.map((user) => (
-                              <div key={user.assignment_id} className="flex items-center gap-2 text-sm">
-                                <Badge variant="secondary" className="text-xs">
-                                  {user.role.replace('_', ' ')}
-                                </Badge>
-                                <span>{user.display_name || 'Unknown User'}</span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">No users assigned</span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setRegionAssign({ open: true, regionId: region.id, controllerId: (region as any).controller_id || null })}
+                          >
+                            Manage Assignments
+                          </Button>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -489,6 +579,42 @@ export const LocationHierarchyManagement = () => {
                   ))}
                 </TableBody>
               </Table>
+              {/* Region assignments dialog */}
+              <Dialog open={regionAssign.open} onOpenChange={(open) => setRegionAssign(prev => ({ ...prev, open }))}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Region Assignments</DialogTitle>
+                    <DialogDescription>Set region controller</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Controller</Label>
+                      <select
+                        className="border rounded p-2 w-full"
+                        value={regionAssign.controllerId || ''}
+                        onChange={(e) => setRegionAssign(prev => ({ ...prev, controllerId: e.target.value || null }))}
+                      >
+                        <option value="">Unassigned</option>
+                        {usersWithRoles.filter((u: any) => u.role === 'controller').map((u: any) => (
+                          <option key={u.id} value={u.id}>{u.display_name}</option>
+                        ))}
+                      </select>
+                      <div className="mt-2">
+                        <Button
+                          size="sm"
+                          onClick={async () => {
+                            if (!regionAssign.regionId) return;
+                            await fastapiClient.put(`/locations/regions/${regionAssign.regionId}`, { controller_id: regionAssign.controllerId });
+                          }}
+                        >Save Controller</Button>
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setRegionAssign({ open: false, regionId: null, controllerId: null })}>Close</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </CardContent>
           </Card>
         </TabsContent>
@@ -574,7 +700,7 @@ export const LocationHierarchyManagement = () => {
                     <TableHead>Name</TableHead>
                     <TableHead>Region</TableHead>
                     <TableHead>Country</TableHead>
-                    <TableHead>Assigned Users</TableHead>
+                    <TableHead>Managers & Users</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -585,20 +711,19 @@ export const LocationHierarchyManagement = () => {
                       <TableCell>{branch.region?.name}</TableCell>
                       <TableCell>{branch.country?.name}</TableCell>
                       <TableCell>
-                        {branch.assigned_users && branch.assigned_users.length > 0 ? (
-                          <div className="space-y-1">
-                            {branch.assigned_users.map((user) => (
-                              <div key={user.assignment_id} className="flex items-center gap-2 text-sm">
-                                <Badge variant="secondary" className="text-xs">
-                                  {user.role.replace('_', ' ')}
-                                </Badge>
-                                <span>{user.display_name || 'Unknown User'}</span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">No users assigned</span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const currentUserIds = (branch.assigned_users || []).map((u: any) => u.user_id);
+                              setBranchUserIds(currentUserIds);
+                              setBranchAssign({ open: true, branchId: branch.id, branchManagerId: (branch as any).branch_manager_id || null, financeManagerId: (branch as any).manager_id || null });
+                            }}
+                          >
+                            Manage Managers / Users
+                          </Button>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -619,6 +744,140 @@ export const LocationHierarchyManagement = () => {
                   ))}
                 </TableBody>
               </Table>
+              {/* Branch assignments dialog */}
+              <Dialog open={branchAssign.open} onOpenChange={(open) => setBranchAssign(prev => ({ ...prev, open }))}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Branch Assignments</DialogTitle>
+                    <DialogDescription>Set branch and finance managers</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Branch Manager</Label>
+                      <select
+                        className="border rounded p-2 w-full"
+                        value={branchAssign.branchManagerId || ''}
+                        onChange={(e) => setBranchAssign(prev => ({ ...prev, branchManagerId: e.target.value || null }))}
+                      >
+                        <option value="">Unassigned</option>
+                        {usersWithRoles.filter((u: any) => u.role === 'branch_manager').map((u: any) => (
+                          <option key={u.id} value={u.id}>{u.display_name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <Label>Finance Manager</Label>
+                      <select
+                        className="border rounded p-2 w-full"
+                        value={branchAssign.financeManagerId || ''}
+                        onChange={(e) => setBranchAssign(prev => ({ ...prev, financeManagerId: e.target.value || null }))}
+                      >
+                        <option value="">Unassigned</option>
+                        {usersWithRoles.filter((u: any) => u.role === 'finance_manager').map((u: any) => (
+                          <option key={u.id} value={u.id}>{u.display_name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={async () => {
+                          if (!branchAssign.branchId) return;
+                          await fastapiClient.put(`/locations/branches/${branchAssign.branchId}`, { branch_manager_id: branchAssign.branchManagerId });
+                        }}
+                      >Save Branch Manager</Button>
+                      <Button
+                        onClick={async () => {
+                          if (!branchAssign.branchId) return;
+                          await fastapiClient.put(`/locations/branches/${branchAssign.branchId}`, { manager_id: branchAssign.financeManagerId });
+                        }}
+                      >Save Finance Manager</Button>
+                    </div>
+                    <div>
+                      <Label>Users Assigned to Branch</Label>
+                      <div className="border rounded p-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            placeholder="Search users by name or role"
+                            className="border rounded p-2 w-full"
+                            onChange={(e) => setUserSearch(e.target.value)}
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const filtered = filteredUsers.map(u => u.id);
+                              setBranchUserIds(prev => Array.from(new Set([...prev, ...filtered])));
+                            }}
+                          >Select All</Button>
+                          <Button size="sm" variant="ghost" onClick={() => setBranchUserIds([])}>Clear</Button>
+                        </div>
+                        <div className="max-h-60 overflow-auto border rounded p-2 space-y-1">
+                          {filteredUsers.slice(0, 200).map((u: any) => (
+                            <label key={u.id} className="flex items-center gap-2 text-sm">
+                              <input
+                                type="checkbox"
+                                checked={branchUserIds.includes(u.id)}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setBranchUserIds(prev => checked ? [...prev, u.id] : prev.filter(id => id !== u.id));
+                                }}
+                              />
+                              <span className="px-2 py-0.5 border rounded min-w-[10rem]">{u.display_name}</span>
+                              <span className="text-muted-foreground">({u.role})</span>
+                            </label>
+                          ))}
+                          {filteredUsers.length > 200 && (
+                            <div className="text-xs text-muted-foreground">Showing first 200 results, refine your search…</div>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {branchUserIds.map(id => {
+                            const u = usersWithRoles.find((x: any) => x.id === id);
+                            if (!u) return null;
+                            return (
+                              <span key={id} className="text-xs border rounded px-2 py-1 flex items-center gap-2">
+                                {u.display_name} <em className="text-muted-foreground">({u.role})</em>
+                                <button className="text-red-500" onClick={() => setBranchUserIds(prev => prev.filter(x => x !== id))}>×</button>
+                              </span>
+                            );
+                          })}
+                        </div>
+                        <div>
+                          <Button
+                            size="sm"
+                            disabled={savingUsers}
+                            onClick={async () => {
+                              if (!branchAssign.branchId) return;
+                              setSavingUsers(true);
+                              try {
+                                const currentIds = (branches.find(b => b.id === branchAssign.branchId)?.assigned_users || []).map((u: any) => u.user_id);
+                                const toAdd = branchUserIds.filter(id => !currentIds.includes(id));
+                                const toRemove = currentIds.filter((id: string) => !branchUserIds.includes(id));
+                                for (const id of toAdd) {
+                                  await fastapiClient.post('/user-assignments/branch-assignments', { user_id: id, branch_id: branchAssign.branchId });
+                                }
+                                const currentAssignments = (branches.find(b => b.id === branchAssign.branchId)?.assigned_users || []);
+                                for (const id of toRemove) {
+                                  const assignment = currentAssignments.find((a: any) => a.user_id === id);
+                                  if (assignment) {
+                                    await fastapiClient.delete(`/user-assignments/branch-assignments/${assignment.assignment_id}`);
+                                  }
+                                }
+                              } finally {
+                                setSavingUsers(false);
+                              }
+                            }}
+                          >Save Users</Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setBranchAssign({ open: false, branchId: null, branchManagerId: null, financeManagerId: null })}>Close</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
               {branchesData && (
                 <Pagination
                   currentPage={branchesPage}

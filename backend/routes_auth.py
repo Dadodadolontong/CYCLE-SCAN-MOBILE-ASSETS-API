@@ -189,9 +189,9 @@ def callback(code: str = Query(...), state: str = Query(None)):
                 access_token = create_access_token(
                     data={"sub": user.id}, expires_delta=access_token_expires
                 )
-                # Redirect to frontend dashboard with token
+                # Redirect to frontend auth page with token, so frontend can finalize session setup
                 return RedirectResponse(
-                    url=f"{config.FRONTEND_URL}/dashboard?token={access_token}"
+                    url=f"{config.FRONTEND_URL}/auth?token={access_token}"
                 )
             else:
                 # User is not active (locked or pending review)

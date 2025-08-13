@@ -83,3 +83,23 @@ def remove_branch_assignment(
     current_user = Depends(require_role("admin"))
 ):
     return UserAssignmentService(db).remove_branch_assignment(assignment_id) 
+
+# Recommendator assignments (country/category)
+@router.post("/country-recommendators")
+def upsert_country_recommendator(
+    country_id: str = Body(...),
+    user_id: str = Body(...),
+    category_id: str | None = Body(None),
+    active: bool = Body(True),
+    db: Session = Depends(get_db),
+    current_user = Depends(require_role("admin"))
+):
+    return UserAssignmentService(db).upsert_country_recommendator(country_id, user_id, category_id, active)
+
+@router.delete("/country-recommendators/{assignment_id}")
+def delete_country_recommendator(
+    assignment_id: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_role("admin"))
+):
+    return UserAssignmentService(db).delete_country_recommendator(assignment_id)

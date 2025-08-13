@@ -292,7 +292,7 @@ const Dashboard = () => {
         </Card>
 
         {/* Development Test Section - Only show in development */}
-        {import.meta.env.DEV && (
+        {/* {import.meta.env.DEV && (
           <Card className="mt-6 border-orange-200 bg-orange-50">
             <CardHeader>
               <CardTitle className="text-orange-800">Development Tests</CardTitle>
@@ -320,7 +320,7 @@ const Dashboard = () => {
               </div>
             </CardContent>
           </Card>
-        )}
+        )} */}
       </div>
     </div>
   );

@@ -286,10 +286,9 @@ export const UserManagement = () => {
       </div>
 
       <Tabs defaultValue="users" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="users">User Roles</TabsTrigger>
           <TabsTrigger value="locations">Location Hierarchy</TabsTrigger>
-          <TabsTrigger value="assignments">User Assignments</TabsTrigger>
         </TabsList>
 
         <TabsContent value="users" className="space-y-6">
@@ -553,9 +552,7 @@ export const UserManagement = () => {
           <LocationHierarchyManagement />
         </TabsContent>
 
-        <TabsContent value="assignments">
-          <UserAssignmentManagement />
-        </TabsContent>
+        {/* User Assignments tab hidden per requirement */}
       </Tabs>
 
       {/* View User Dialog */}

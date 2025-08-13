@@ -2,12 +2,13 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from db import get_db
 from models import User, UserRole
 from config import config
+import os
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -93,3 +94,8 @@ def require_any_role(required_roles: list):
             )
         return current_user
     return role_checker 
+
+def require_n8n(x_workflow_key: str = Header(None)):
+    if not SECRET_KEY or x_workflow_key != SECRET_KEY:
+        raise HTTPException(401, "Unauthorized")
+    return True 

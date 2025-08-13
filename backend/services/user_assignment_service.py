@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException
 from typing import List, Dict, Any
-from models import UserCountryAssignment, UserRegionAssignment, UserBranchAssignment, Country, Region, Branch, UserRole, Profile
+from models import UserCountryAssignment, UserRegionAssignment, UserBranchAssignment, Country, Region, Branch, UserRole, Profile, CountryRecommendatorAssignment
 import uuid
 
 class UserAssignmentService:
@@ -25,6 +25,67 @@ class UserAssignmentService:
                 })
         
         return users_with_roles
+
+    # Recommendator assignments (country/category)
+    def upsert_country_recommendator(self, country_id: str, user_id: str, category_id: str | None, active: bool = True) -> Dict[str, Any]:
+        # Ensure unique (country_id, category_id)
+        existing = self.db.query(CountryRecommendatorAssignment).filter(
+            CountryRecommendatorAssignment.country_id == country_id,
+            CountryRecommendatorAssignment.category_id == category_id,
+        ).first()
+        if existing:
+            existing.user_id = user_id
+            existing.active = active
+            try:
+                self.db.commit()
+                self.db.refresh(existing)
+            except Exception:
+                self.db.rollback()
+                raise HTTPException(status_code=400, detail='Failed to update recommendator assignment')
+            return {
+                'id': existing.id,
+                'country_id': existing.country_id,
+                'category_id': existing.category_id,
+                'user_id': existing.user_id,
+                'active': existing.active,
+                'created_at': existing.created_at,
+                'updated_at': existing.updated_at,
+            }
+        rec = CountryRecommendatorAssignment(
+            id=str(uuid.uuid4()),
+            country_id=country_id,
+            category_id=category_id,
+            user_id=user_id,
+            active=active,
+        )
+        self.db.add(rec)
+        try:
+            self.db.commit()
+            self.db.refresh(rec)
+        except Exception:
+            self.db.rollback()
+            raise HTTPException(status_code=400, detail='Failed to create recommendator assignment')
+        return {
+            'id': rec.id,
+            'country_id': rec.country_id,
+            'category_id': rec.category_id,
+            'user_id': rec.user_id,
+            'active': rec.active,
+            'created_at': rec.created_at,
+            'updated_at': rec.updated_at,
+        }
+
+    def delete_country_recommendator(self, assignment_id: str) -> Dict[str, Any]:
+        rec = self.db.query(CountryRecommendatorAssignment).filter(CountryRecommendatorAssignment.id == assignment_id).first()
+        if not rec:
+            raise HTTPException(status_code=404, detail='Assignment not found')
+        self.db.delete(rec)
+        try:
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise HTTPException(status_code=400, detail='Failed to delete recommendator assignment')
+        return {'ok': True, 'id': assignment_id}
 
     # Country assignments
     def list_country_assignments(self) -> List[Dict[str, Any]]:

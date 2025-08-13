@@ -43,7 +43,10 @@ class Branch(Base):
     name = Column(String(255), nullable=False)
     region_id = Column(String(36), ForeignKey('regions.id', ondelete='CASCADE'), nullable=False)
     country_id = Column(String(36), ForeignKey('countries.id', ondelete='CASCADE'), nullable=True)  # New field
+    # Finance manager assigned to this branch (legacy column name)
     manager_id = Column(String(36), ForeignKey('user_roles.user_id'), unique=True, nullable=True)
+    # Branch manager assigned to this branch
+    branch_manager_id = Column(String(36), ForeignKey('user_roles.user_id'), nullable=True, index=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
     
@@ -233,6 +236,55 @@ class SystemSetting(Base):
     description = Column(String(255))
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+class CountryRecommendatorAssignment(Base):
+    __tablename__ = 'country_recommendator_assignments'
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    country_id = Column(String(36), ForeignKey('countries.id', ondelete='CASCADE'), nullable=False, index=True)
+    # Optional category override; when null, acts as default recommendator for the country
+    category_id = Column(String(36), ForeignKey('categories.id'), nullable=True, index=True)
+    user_id = Column(String(36), ForeignKey('user_roles.user_id'), nullable=False)
+    active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    __table_args__ = (
+        UniqueConstraint('country_id', 'category_id', name='ux_country_category_recommendator'),
+    )
+
+# Workflow minimal models
+class WorkflowScenario(Base):
+    __tablename__ = 'workflow_scenarios'
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String(128), unique=True, nullable=False)
+    description = Column(String(255))
+    rules = Column(JSON, nullable=False)  # { steps: [ { actor: 'branch_manager' }, ... ] }
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+class WorkflowInstance(Base):
+    __tablename__ = 'workflow_instances'
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    scenario_name = Column(String(128), nullable=False)
+    business_ref = Column(String(128), nullable=False, index=True)
+    requester_email = Column(String(255), nullable=True)
+    status = Column(String(32), default='pending')  # pending|approved|rejected|cancelled
+    current_step = Column(Integer, default=0)
+    callback_url = Column(String(255), nullable=True)
+    callback_token = Column(String(255), nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+class WorkflowStep(Base):
+    __tablename__ = 'workflow_steps'
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    instance_id = Column(String(36), ForeignKey('workflow_instances.id', ondelete='CASCADE'), nullable=False)
+    step_index = Column(Integer, nullable=False)
+    actor_type = Column(String(64), nullable=False)
+    assigned_actor_ids = Column(JSON)  # [user_ids]
+    status = Column(String(32), default='pending')
+    decided_by = Column(String(36))
+    decided_at = Column(DateTime)
+    data = Column(JSON)
 
 class UserSession(Base):
     __tablename__ = 'user_sessions'

@@ -292,6 +292,70 @@ class AssetTransferOut(AssetTransferBase):
     class Config:
         from_attributes = True 
 
+# Workflow/Assignments
+class CountryRecommendatorAssignmentBase(BaseModel):
+    country_id: str
+    category_id: Optional[str] = None
+    user_id: str
+    active: bool = True
+
+class CountryRecommendatorAssignmentCreate(CountryRecommendatorAssignmentBase):
+    pass
+
+class CountryRecommendatorAssignmentUpdate(CountryRecommendatorAssignmentBase):
+    pass
+
+class CountryRecommendatorAssignmentOut(CountryRecommendatorAssignmentBase):
+    id: str
+    created_at: datetime
+    updated_at: datetime
+    class Config:
+        from_attributes = True
+
+# Workflow schemas
+class WorkflowScenarioBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    rules: Dict[str, Any]
+    is_active: bool = True
+
+class WorkflowScenarioCreate(WorkflowScenarioBase):
+    pass
+
+class WorkflowScenarioOut(WorkflowScenarioBase):
+    id: str
+    class Config:
+        from_attributes = True
+
+class WorkflowTriggerIn(BaseModel):
+    scenario_name: str
+    business_ref: str
+    requester_email: Optional[str] = None
+    current_step: Optional[int] = 0
+    callback_url: Optional[str] = None
+
+class WorkflowTriggerOut(BaseModel):
+    instance_id: str
+    status: str    
+
+class WorkflowResolveNextIn(BaseModel):
+    scenario_name: str
+    business_ref: str
+    current_step: int
+    context: Optional[Dict[str, Any]] = None
+
+class WorkflowResolveNextOut(BaseModel):
+    step_index: int
+    actors: List[Dict[str, str]]
+    end: bool = False
+
+class WorkflowDecisionIn(BaseModel):
+    step_index: int
+    action: str  # approve|reject
+    comment: Optional[str] = None
+    actor_id: Optional[str] = None
+    step_token: Optional[str] = None
+
 class OAuthProviderBase(BaseModel):
     name: str
     client_id: str

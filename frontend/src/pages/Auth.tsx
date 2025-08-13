@@ -15,7 +15,7 @@ const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const { user, signInWithPassword, signUpWithPassword } = useAuth();
+  const { user, signInWithPassword, signUpWithPassword, setUser } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -62,6 +62,28 @@ const Auth = () => {
     }
   }, [location, toast]);
 
+  // Handle OAuth callback token set by backend redirect to /auth?token=...
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const token = params.get('token');
+    const returnTo = params.get('return_to');
+    if (token) {
+      (async () => {
+        try {
+          // Store token and fetch current user silently
+          fastapiClient.setToken(token);
+          const me = await fastapiClient.getCurrentUser(true);
+          setUser(me);
+          // Clean URL and navigate
+          const target = returnTo || '/dashboard';
+          navigate(target, { replace: true });
+        } catch (err) {
+          // ignore; user can still sign in manually
+        }
+      })();
+    }
+  }, [location.search, navigate, setUser]);
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -101,7 +123,10 @@ const Auth = () => {
           title: "Welcome back!",
           description: "You have been signed in successfully.",
         });
-        navigate('/dashboard');
+        const params = new URLSearchParams(location.search);
+        const returnTo = params.get('return_to');
+        if (returnTo) navigate(returnTo, { replace: true });
+        else navigate('/dashboard', { replace: true });
       }
     } catch (error) {
       toast({

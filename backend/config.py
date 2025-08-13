@@ -73,6 +73,17 @@ class Config:
     REDIS_DB = int(os.getenv("REDIS_DB", "0"))
     REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
 
+    # n8n Webhook
+    N8N_WEBHOOK_URL: str = os.getenv("N8N_WEBHOOK_URL", "")
+
+    # SMTP
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER: str = os.getenv("SMTP_USER", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_FROM: str = os.getenv("SMTP_FROM", "")
+    SMTP_TLS: bool = os.getenv("SMTP_TLS", "true").lower() == "true"
+
     @classmethod
     def is_development(cls) -> bool:
         return cls.NODE_ENV.lower() == "development"

@@ -22,6 +22,7 @@ const AssetTransferCreate = () => {
   const [page, setPage] = useState(1);
   const pageSize = 20;
   const totalPages = Math.ceil(scannedAssets.length / pageSize);
+  const [photos, setPhotos] = useState<File[]>([]);
 
   const handleAddBarcode = async () => {
     if (barcodeInput && !assetBarcodes.includes(barcodeInput)) {
@@ -70,11 +71,20 @@ const AssetTransferCreate = () => {
     setSelectedBarcodes([]);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Integrate with backend
-    alert("Transfer request submitted! (not yet integrated)");
-    navigate("/dashboard");
+    try {
+      const res = await fastapiClient.createAssetTransfer({
+        source_location_id: sourceLocation,
+        destination_location_id: destinationLocation,
+        barcodes: assetBarcodes,
+        photos,
+      });
+      alert(`Transfer ${res.transfer_number} submitted (${res.status})`);
+      navigate('/dashboard');
+    } catch (err: any) {
+      setAssetError(err.message || 'Failed to submit transfer');
+    }
   };
 
   return (
@@ -173,6 +183,18 @@ const AssetTransferCreate = () => {
                   Next
                 </Button>
               </div>
+            </div>
+            <div>
+              <label className="block mb-1 font-medium">Photos (optional, up to 3)</label>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []).slice(0, 3);
+                  setPhotos(files as File[]);
+                }}
+              />
             </div>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => navigate("/dashboard")}>Cancel</Button>

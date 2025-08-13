@@ -18,6 +18,7 @@ import DataImport from "./pages/DataImport";
 import { TestCsvUpload } from "./pages/TestCsvUpload";
 import NotFound from "./pages/NotFound";
 import AssetTransferCreate from "./pages/AssetTransferCreate";
+import ApprovalReview from "./pages/ApprovalReview";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -109,6 +110,11 @@ const App = () => (
               </AdminRoute>
             } />
             <Route path="/asset-transfer/create" element={<AssetTransferCreate />} />
+            <Route path="/approvals/:instanceId" element={
+              <ProtectedRoute>
+                <ApprovalReview />
+              </ProtectedRoute>
+            } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

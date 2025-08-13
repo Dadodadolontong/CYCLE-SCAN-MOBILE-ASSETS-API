@@ -40,19 +40,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     // Only redirect if not already on auth page
     if (location.pathname !== '/auth') {
-      navigate('/auth', { replace: true });
+      const returnTo = encodeURIComponent(location.pathname + location.search);
+      navigate(`/auth?return_to=${returnTo}`, { replace: true });
     }
   }, [navigate, location.pathname, toast]);
 
   useEffect(() => {
-    // Check for token in URL
-    const params = new URLSearchParams(location.search);
-    const token = params.get('token');
-    if (token) {
-      fastapiClient.setToken(token);
-      fastapiClient.getCurrentUser().then(setUser);
-      window.history.replaceState({}, document.title, location.pathname);
-    }
+    // Do NOT treat workflow step tokens as auth tokens; only handle OAuth callback flow if ever used
+    // For now, ignore arbitrary token query params
   }, [location]);
 
   useEffect(() => {
@@ -62,8 +57,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Check for existing authentication on app load
     const checkAuth = async () => {
       try {
+        // Avoid noisy checks on auth page without a token
+        if (location.pathname === '/auth' && !fastapiClient.isAuthenticated()) return;
         if (fastapiClient.isAuthenticated()) {
-          const userData = await fastapiClient.getCurrentUser();
+          const userData = await fastapiClient.getCurrentUser(true);
           setUser(userData);
         }
       } catch (error) {
@@ -76,7 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     checkAuth();
-  }, [handleSessionTimeout]);
+  }, [handleSessionTimeout, location.pathname]);
 
   const signInWithPassword = async (email: string, password: string) => {
     try {
@@ -86,7 +83,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
 
       await fastapiClient.login(credentials);
-      const userData = await fastapiClient.getCurrentUser();
+      const userData = await fastapiClient.getCurrentUser(true);
       setUser(userData);
       
       return { error: null };

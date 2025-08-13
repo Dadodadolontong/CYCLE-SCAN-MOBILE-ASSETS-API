@@ -260,6 +260,7 @@ class LocationService:
                     'name': branch.region.country.name,
                     'code': branch.region.country.code,
                 },
+                'branch_manager_id': getattr(branch, 'branch_manager_id', None),
                 'assigned_users': assigned_users,
                 'created_at': branch.created_at,
                 'updated_at': branch.updated_at,
@@ -305,6 +306,12 @@ class LocationService:
         branch = self.db.query(Branch).filter(Branch.id == branch_id).first()
         if not branch:
             raise HTTPException(status_code=404, detail='Branch not found')
+        # Validate branch_manager_id role if provided
+        if 'branch_manager_id' in updates and updates['branch_manager_id']:
+            bm_id = updates['branch_manager_id']
+            role = self.db.query(UserRole).filter(UserRole.user_id == bm_id).first()
+            if not role or role.role != 'branch_manager':
+                raise HTTPException(status_code=422, detail='branch_manager_id must reference a user with role "branch_manager"')
         for k, v in updates.items():
             setattr(branch, k, v)
         try:

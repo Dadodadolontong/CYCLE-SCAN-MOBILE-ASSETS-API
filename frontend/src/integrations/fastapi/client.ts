@@ -139,9 +139,12 @@ class FastAPIClient {
       if (!response.ok) {
         // Handle 401 Unauthorized (session timeout)
         if (response.status === 401) {
-          this.clearToken();
-          if (this.onSessionTimeout) {
-            this.onSessionTimeout();
+          const suppress = (config.headers as any)?.['X-Suppress-Session-Timeout'] || (options.headers as any)?.['X-Suppress-Session-Timeout'];
+          if (!suppress) {
+            this.clearToken();
+            if (this.onSessionTimeout) {
+              this.onSessionTimeout();
+            }
           }
           throw new Error('Session expired. Please log in again.');
         }
@@ -191,8 +194,10 @@ class FastAPIClient {
     });
   }
 
-  async getCurrentUser(): Promise<UserResponse> {
-    return this.request<UserResponse>('/auth/me');
+  async getCurrentUser(silent: boolean = false): Promise<UserResponse> {
+    const headers: Record<string, string> = {};
+    if (silent) headers['X-Suppress-Session-Timeout'] = '1';
+    return this.request<UserResponse>('/auth/me', { method: 'GET', headers });
   }
 
   // Token management
@@ -245,6 +250,21 @@ class FastAPIClient {
     return this.request<T>(endpoint, {
       method: 'DELETE',
     });
+  }
+
+  // Asset Transfers
+  async createAssetTransfer(params: {
+    source_location_id: string;
+    destination_location_id: string;
+    barcodes: string[];
+    photos?: File[];
+  }): Promise<{ id: string; transfer_number: string; status: string; created_at: string }> {
+    const form = new FormData();
+    form.append('source_location_id', params.source_location_id);
+    form.append('destination_location_id', params.destination_location_id);
+    form.append('barcodes', JSON.stringify(params.barcodes));
+    (params.photos || []).slice(0, 3).forEach((f, idx) => form.append(`photo${idx + 1}`, f));
+    return this.post('/asset-transfers', form);
   }
 
   // ERP Integration methods
