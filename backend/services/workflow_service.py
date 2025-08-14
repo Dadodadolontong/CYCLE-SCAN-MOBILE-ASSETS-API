@@ -102,7 +102,7 @@ class WorkflowService:
         actors = self._resolve_actors(actor_type, scope, context or {})
         return { 'step_index': current_step, 'actors': actors, 'end': False }
 
-    def decide(self, instance_id: str, step_index: int, actor_id: str, action: str, comment: Optional[str], step_token: Optional[str] = None, destination_location_id: Optional[str] = None) -> Dict[str, Any]:
+    def decide(self, instance_id: str, step_index: int, actor_id: str, action: str, comment: Optional[str], step_token: Optional[str] = None, item_details: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         instance = self.db.query(WorkflowInstance).filter(WorkflowInstance.id == instance_id).first()
         if not instance:
             raise HTTPException(status_code=404, detail='Instance not found')
@@ -135,16 +135,29 @@ class WorkflowService:
         all_steps = (scenario.rules or {}).get('steps', []) if scenario else []
         steps_def = [step for step in all_steps if not step.get("notify_only", False)]
         step_def = steps_def[step_index] if step_index < len(steps_def) else {}
-        if action == 'approve' and destination_location_id and step_row.actor_type in ('branch_manager', 'finance_manager') and step_def.get('scope') == 'receiving':
+        if action == 'approve' and item_details and step_row.actor_type in ('finance_manager') and step_def.get('scope') == 'receiving':
             at = self.db.query(AssetTransfer).filter(AssetTransfer.transfer_number == instance.business_ref).first()
             if at:
-                loc = self.db.query(Location).filter(Location.id == destination_location_id).first()
-                if not loc:
-                    raise HTTPException(status_code=422, detail='Invalid destination location')
-                if at.destination_branch_id and loc.branch_id != at.destination_branch_id:
-                    raise HTTPException(status_code=422, detail='Destination location must be in destination branch')
-                at.destination_location_id = destination_location_id
-                self.db.add(at)
+                # Build dict of incoming updates: id -> dest loc
+                updates = {str(d.get('id')): d.get('destination_location_id') for d in item_details if d.get('id') and d.get('destination_location_id')}
+                if updates:
+                    # Validate locations belong to destination branch
+                    locs = {l.id: l for l in self.db.query(Location).filter(Location.id.in_(list(updates.values()))).all()}
+                    for loc_id in updates.values():
+                        loc = locs.get(loc_id)
+                        if not loc:
+                            raise HTTPException(status_code=422, detail='Invalid destination location')
+                        if at.destination_branch_id and loc.branch_id != at.destination_branch_id:
+                            raise HTTPException(status_code=422, detail='Destination location must be in destination branch')
+                    # Persist per-item
+                    items = self.db.query(AssetTransferItem).filter(AssetTransferItem.transfer_id == at.id).all()
+                    for itm in items:
+                        dest = updates.get(str(itm.id))
+                        if dest:
+                            setattr(itm, 'destination_location_id', dest)
+                            self.db.add(itm)
+
+                
 
         # Record decision on the planned step row
         step_row.status = 'approved' if action == 'approve' else 'rejected'
@@ -254,15 +267,17 @@ class WorkflowService:
             for itm in items:
                 asset = self.db.query(Asset).filter(Asset.id == itm.asset_id).first()
                 detailed_items.append({
+                    'id': getattr(itm, 'id', ''),
+                    'asset_id': getattr(itm, 'asset_id', ''),
                     'barcode': getattr(itm, 'barcode', ''),
                     'name': getattr(asset, 'name', ''),
+                    'destination_location_id': getattr(itm, 'destination_location_id', None),
                 })
             data['transfer'] = {
                 'id': at.id,
                 'transfer_number': at.transfer_number,
                 'source_branch_id': getattr(at, 'source_branch_id', None),
                 'destination_branch_id': getattr(at, 'destination_branch_id', None),
-                'destination_location_id': getattr(at, 'destination_location_id', None),
                 'created_at': at.created_at,
                 'source_branch_name': getattr(src_branch, 'name', None),
                 'destination_branch_name': getattr(dst_branch, 'name', None),

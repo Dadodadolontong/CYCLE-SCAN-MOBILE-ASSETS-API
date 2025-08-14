@@ -256,6 +256,8 @@ class AssetTransferItemCreate(AssetTransferItemBase):
 
 class AssetTransferItemOut(AssetTransferItemBase):
     id: str
+    destination_location_id: Optional[str] = None
+    asset_id: str
     class Config:
         from_attributes = True
 
@@ -356,6 +358,8 @@ class WorkflowDecisionIn(BaseModel):
     actor_id: Optional[str] = None
     step_token: Optional[str] = None
     destination_location_id: Optional[str] = None
+    # Optional bulk per-item details coming from the UI
+    item_details: Optional[List[Dict[str, Any]]] = None
 
 class OAuthProviderBase(BaseModel):
     name: str

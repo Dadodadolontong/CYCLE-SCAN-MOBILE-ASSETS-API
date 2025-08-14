@@ -68,7 +68,7 @@ def get_access_scope_for_user(db, user_id: str):
 
     # Accounting manager: assigned countries
     if 'accounting_manager' in roles:
-        assigned_countries = db.query(UserCountryAssignment.country_id).filter(UserCountryAssignment.user_id == user_id).all()
+        assigned_countries = db.query(Country.id).filter(Country.accounting_manager_id == user_id).all()
         for (country_id,) in assigned_countries:
             country_ids.add(country_id)
             # All regions in country
@@ -83,7 +83,7 @@ def get_access_scope_for_user(db, user_id: str):
 
     # Controller: assigned regions
     if 'controller' in roles:
-        assigned_regions = db.query(UserRegionAssignment.region_id).filter(UserRegionAssignment.user_id == user_id).all()
+        assigned_regions = db.query(Region.id).filter(Region.controller_id == user_id).all()
         for (region_id,) in assigned_regions:
             region_ids.add(region_id)
             region = db.query(Region).filter(Region.id == region_id).first()
@@ -98,7 +98,7 @@ def get_access_scope_for_user(db, user_id: str):
 
     # Manager/user: assigned branches
     if 'manager' in roles or 'user' in roles:
-        assigned_branches = db.query(UserBranchAssignment.branch_id).filter(UserBranchAssignment.user_id == user_id).all()
+        assigned_branches = db.query(Branch.id).filter(Branch.manager_id == user_id).all()
         for (branch_id,) in assigned_branches:
             branch_ids.add(branch_id)
             branch = db.query(Branch).filter(Branch.id == branch_id).first()

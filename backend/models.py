@@ -339,6 +339,7 @@ class AssetTransferItem(Base):
     transfer_id = Column(String(36), ForeignKey('asset_transfers.id'), nullable=False)
     asset_id = Column(String(36), ForeignKey('assets.id'), nullable=False)
     barcode = Column(String(64), nullable=False)
+    destination_location_id = Column(String(36), ForeignKey('locations.id'), nullable=True)
     transfer = relationship('AssetTransfer', back_populates='items')
 
 class AssetTransferApproval(Base):

@@ -37,7 +37,7 @@ def decision(instance_id: str, body: WorkflowDecisionIn, db: Session = Depends(g
         body.action,
         body.comment,
         body.step_token,
-        getattr(body, 'destination_location_id', None)
+        getattr(body, 'item_details', None)
     )
 
 @router.get("/inbox")

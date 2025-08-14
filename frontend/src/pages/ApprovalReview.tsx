@@ -29,9 +29,8 @@ const ApprovalReview = () => {
     }
   }, [location.pathname, location.search, navigate]);
 
-  const [destinationLocationId, setDestinationLocationId] = useState('');
-  const [destLocations, setDestLocations] = useState<any[]>([]);
   const [instDetails, setInstDetails] = useState<any>(null);
+  const [destLocations, setDestLocations] = useState<any[]>([]);
 
   const currentStepRow = useMemo(() => {
     if (!instDetails || !Array.isArray(instDetails.history)) return null;
@@ -48,6 +47,7 @@ const ApprovalReview = () => {
       try {
         const inst = await fastapiClient.getWorkflowInstance(instanceId);
         setInstDetails(inst);
+        // Items already carry destination_location_id if any
         const destBranchId = inst?.transfer?.destination_branch_id;
         if (destBranchId) {
           const list: any = await fastapiClient.getLocationsByBranch(destBranchId);
@@ -60,20 +60,27 @@ const ApprovalReview = () => {
 
   const submit = async (action: 'approve' | 'reject') => {
     if (!instanceId) return;
-    if (action === 'approve' && isReceivingFinance && !destinationLocationId) {
-      toast({ title: 'Destination required', description: 'Please select a destination location.', variant: 'destructive' });
-      return;
+    if (action === 'approve' && isReceivingFinance) {
+      const items: any[] = Array.isArray(instDetails?.transfer?.items) ? instDetails.transfer.items : [];
+      const missing = items.filter((it) => !it.destination_location_id);
+      if (missing.length > 0) {
+        toast({ title: 'Destination required', description: 'Please set destination location for all items.', variant: 'destructive' });
+        return;
+      }
     }
     setSubmitting(true);
     try {
+      const items: any[] = Array.isArray(instDetails?.transfer?.items) ? instDetails.transfer.items : [];
+      console.log('items', items);
+
       await fastapiClient.post(`/workflows/instances/${instanceId}/decision`, {
         step_index: Number(instDetails?.current_step) || 0,
         action,
         comment,
         step_token: stepToken,
-        destination_location_id: action === 'approve' && destinationLocationId ? destinationLocationId : undefined,
+        item_details: action === 'approve' && isReceivingFinance ? items : undefined,
         actor_id: user?.id,
-      });
+      }); 
       toast({ title: 'Success', description: `Decision submitted: ${action}` });
       navigate('/dashboard', { replace: true });
     } catch (err: any) {
@@ -117,13 +124,27 @@ const ApprovalReview = () => {
                   <tr className="text-left border-b">
                     <th className="py-2 pr-3">Barcode</th>
                     <th className="py-2">Name</th>
+                    <th className="py-2 pl-3">Location</th>
                   </tr>
                 </thead>
                 <tbody>
                   {instDetails.transfer.items.map((it: any, idx: number) => (
-                    <tr key={idx} className="border-b last:border-0">
+                    <tr key={it.id || idx} className="border-b last:border-0">
                       <td className="py-2 pr-3 font-mono">{it.barcode}</td>
                       <td className="py-2">{it.name}</td>
+                      <td className="py-2 pl-3">
+                        <select
+                          className="w-full border rounded p-2"
+                          value={it.destination_location_id || ''}
+                          onChange={(e) => setInstDetails((prev: any) => ({ ...prev, transfer: { ...prev.transfer, items: prev.transfer.items.map((i: any) => i.id === it.id ? { ...i, destination_location_id: e.target.value } : i) } }))}
+                          disabled={!isReceivingFinance}
+                        >
+                          <option value="">Select location</option>
+                          {destLocations.map((l: any) => (
+                            <option key={l.id} value={l.id}>{l.name}</option>
+                          ))}
+                        </select>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -131,23 +152,21 @@ const ApprovalReview = () => {
             </div>
           </div>
         )}
-        {isReceivingFinance && destLocations.length > 0 && (
-          <div className="space-y-2">
-            <Label htmlFor="destLoc">Destination Location (required for receiving finance manager)</Label>
-            <select id="destLoc" className="w-full border rounded p-2" value={destinationLocationId} onChange={(e) => setDestinationLocationId(e.target.value)}>
-              <option value="">Select destination location</option>
-              {destLocations.map((l: any) => (
-                <option key={l.id} value={l.id}>{l.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
+        
         <div className="space-y-2">
           <Label htmlFor="comment">Comments</Label>
           <Textarea id="comment" value={comment} onChange={(e) => setComment(e.target.value)} rows={4} />
         </div>
         <div className="flex gap-3">
-          <Button disabled={submitting || (isReceivingFinance && !destinationLocationId)} onClick={() => submit('approve')}>Approve</Button>
+          <Button
+            disabled={
+              submitting ||
+              (isReceivingFinance && (Array.isArray(instDetails?.transfer?.items) && instDetails.transfer.items.some((it: any) => !it.destination_location_id)))
+            }
+            onClick={() => submit('approve')}
+          >
+            Approve
+          </Button>
           <Button disabled={submitting} variant="destructive" onClick={() => submit('reject')}>Reject</Button>
           <Button disabled={submitting} variant="outline" onClick={handleCancel}>Cancel</Button>
         </div>
