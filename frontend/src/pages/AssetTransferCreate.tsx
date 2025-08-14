@@ -6,13 +6,16 @@ import { Input } from "@/components/ui/input";
 import { useLocations } from "@/hooks/useLocations";
 import { useEffect } from "react";
 import { fastapiClient } from "@/integrations/fastapi/client";
+import { useAuth } from "@/contexts/FastAPIAuthContext";
 
 const AssetTransferCreate = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { data: locationsData = { items: [], total: 0 } } = useLocations();
   const locations = locationsData.items || [];
-  const [sourceLocation, setSourceLocation] = useState("");
-  const [destinationLocation, setDestinationLocation] = useState("");
+  const [sourceBranch, setSourceBranch] = useState("");
+  const [destinationBranch, setDestinationBranch] = useState("");
+  const [remarks, setRemarks] = useState("");
   const [barcodeInput, setBarcodeInput] = useState("");
   const [assetBarcodes, setAssetBarcodes] = useState<string[]>([]);
   const [scannedAssets, setScannedAssets] = useState<{ barcode: string; name: string }[]>([]);
@@ -23,6 +26,27 @@ const AssetTransferCreate = () => {
   const pageSize = 20;
   const totalPages = Math.ceil(scannedAssets.length / pageSize);
   const [photos, setPhotos] = useState<File[]>([]);
+  const [initiatingBranches, setInitiatingBranches] = useState<any[]>([]);
+  const [destinationBranches, setDestinationBranches] = useState<any[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      const list = await fastapiClient.getInitiatingBranches();
+      setInitiatingBranches(list || []);
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      if (!sourceBranch) { setDestinationBranches([]); return; }
+      const src = initiatingBranches.find((b) => b.id === sourceBranch);
+      const countryId = src?.country?.id;
+      if (countryId) {
+        const list = await fastapiClient.get(`/locations/branches?country_id=${encodeURIComponent(countryId)}&bypass_access=true&limit=1000`);
+        setDestinationBranches(list?.items || list || []);
+      }
+    })();
+  }, [sourceBranch, initiatingBranches]);
 
   const handleAddBarcode = async () => {
     if (barcodeInput && !assetBarcodes.includes(barcodeInput)) {
@@ -32,14 +56,16 @@ const AssetTransferCreate = () => {
         // Fetch asset by barcode
         const asset = await fastapiClient.get<any>(`/assets/barcode/${encodeURIComponent(barcodeInput)}`);
         // Check for location mismatch
-        if (sourceLocation && asset.location !== sourceLocation) {
+        if (sourceBranch) {
+          const assetLoc = locations.find(loc => loc.id === asset.location);
+          const assetBranchId = assetLoc?.branch_id;
+          if (assetBranchId && assetBranchId !== sourceBranch) {
           // Find the asset's location name for better error message
-          const assetLocationName = locations.find(loc => loc.id === asset.location)?.name || asset.location;
-          const sourceLocationName = locations.find(loc => loc.id === sourceLocation)?.name || sourceLocation;
-          
-          setAssetError(`Location mismatch! Asset "${asset.name}" is located at "${assetLocationName}" but you're scanning from "${sourceLocationName}". Please verify the asset location.`);
-          setLoadingAsset(false);
-          return;
+            const assetLocationName = assetLoc?.name || asset.location;
+            setAssetError(`Location mismatch! Asset "${asset.name}" is under a different branch than selected source. Asset location: "${assetLocationName}"`);
+            setLoadingAsset(false);
+            return;
+          }
         }
         
         setAssetBarcodes([...assetBarcodes, barcodeInput]);
@@ -75,13 +101,18 @@ const AssetTransferCreate = () => {
     e.preventDefault();
     try {
       const res = await fastapiClient.createAssetTransfer({
-        source_location_id: sourceLocation,
-        destination_location_id: destinationLocation,
+        source_branch_id: sourceBranch,
+        destination_branch_id: destinationBranch,
         barcodes: assetBarcodes,
+        remarks: remarks || undefined,
         photos,
       });
-      alert(`Transfer ${res.transfer_number} submitted (${res.status})`);
-      navigate('/dashboard');
+      const instanceId = (res as any).instance_id;
+      if (instanceId) {
+        navigate(`/approvals/${instanceId}`);
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err: any) {
       setAssetError(err.message || 'Failed to submit transfer');
     }
@@ -96,32 +127,36 @@ const AssetTransferCreate = () => {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label className="block mb-1 font-medium">Source Location</label>
+              <label className="block mb-1 font-medium">Source Branch</label>
               <select
                 className="w-full border rounded p-2"
-                value={sourceLocation}
-                onChange={e => setSourceLocation(e.target.value)}
+                value={sourceBranch}
+                onChange={e => setSourceBranch(e.target.value)}
                 required
               >
-                <option value="">Select source location</option>
-                {locations.map(loc => (
-                  <option key={loc.id} value={loc.id}>{loc.name}</option>
+                <option value="">Select source branch</option>
+                {initiatingBranches.map((b: any) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block mb-1 font-medium">Destination Location</label>
+              <label className="block mb-1 font-medium">Destination Branch</label>
               <select
                 className="w-full border rounded p-2"
-                value={destinationLocation}
-                onChange={e => setDestinationLocation(e.target.value)}
+                value={destinationBranch}
+                onChange={e => setDestinationBranch(e.target.value)}
                 required
               >
-                <option value="">Select destination location</option>
-                {locations.map(loc => (
-                  <option key={loc.id} value={loc.id}>{loc.name}</option>
+                <option value="">Select destination branch</option>
+                {destinationBranches.map((b: any) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="block mb-1 font-medium">Remarks (optional)</label>
+              <Input value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="Enter remarks" />
             </div>
             <div>
               <label className="block mb-1 font-medium">Asset Barcodes</label>
@@ -198,7 +233,7 @@ const AssetTransferCreate = () => {
             </div>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => navigate("/dashboard")}>Cancel</Button>
-              <Button type="submit" disabled={!sourceLocation || !destinationLocation || assetBarcodes.length === 0}>
+              <Button type="submit" disabled={!sourceBranch || !destinationBranch || assetBarcodes.length === 0}>
                 Submit Transfer Request
               </Button>
             </div>

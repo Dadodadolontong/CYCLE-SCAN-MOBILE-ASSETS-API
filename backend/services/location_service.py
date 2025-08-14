@@ -212,13 +212,15 @@ class LocationService:
         return {'ok': True, 'id': region_id}
 
     # Branch CRUD
-    def list_branches(self, user_id: Optional[str] = None, region_id: Optional[str] = None, search: Optional[str] = None, skip: int = 0, limit: int = 50) -> Dict[str, Any]:
+    def list_branches(self, user_id: Optional[str] = None, region_id: Optional[str] = None, search: Optional[str] = None, skip: int = 0, limit: int = 50, country_id: Optional[str] = None, bypass_access: bool = False) -> Dict[str, Any]:
         q = self.db.query(Branch).join(Region, Branch.region_id == Region.id).join(Country, Region.country_id == Country.id)
         if region_id:
             q = q.filter(Branch.region_id == region_id)
+        if country_id:
+            q = q.filter(Region.country_id == country_id)
         if search:
             q = q.filter(Branch.name.ilike(f'%{search}%'))
-        if user_id:
+        if user_id and not bypass_access:
             scope = get_access_scope_for_user(self.db, user_id)
             if not scope['is_admin']:
                 allowed_ids = set(scope['branch_ids'])
@@ -272,6 +274,22 @@ class LocationService:
             'skip': skip,
             'limit': limit
         }
+
+    def list_initiating_branches(self, user_id: str) -> List[Dict[str, Any]]:
+        # Branches where this user is the finance manager
+        branches = self.db.query(Branch).join(Region, Branch.region_id == Region.id).join(Country, Region.country_id == Country.id).filter(Branch.manager_id == user_id).order_by(Branch.name).all()
+        return [
+            {
+                'id': b.id,
+                'name': b.name,
+                'region_id': b.region_id,
+                'country': {
+                    'id': b.region.country.id,
+                    'name': b.region.country.name,
+                    'code': b.region.country.code,
+                }
+            } for b in branches
+        ]
 
     def create_branch(self, name: str, region_id: str) -> Dict[str, Any]:
         branch = Branch(name=name, region_id=region_id)

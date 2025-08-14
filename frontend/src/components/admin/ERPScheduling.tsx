@@ -232,10 +232,10 @@ export const ERPScheduling = () => {
           <h2 className="text-3xl font-bold text-foreground">ERP Sync Management</h2>
           <p className="text-muted-foreground">Manage Oracle ERP data synchronization</p>
         </div>
-        <Button
+          <Button
           onClick={() => testConnection.mutate()}
           disabled={testConnection.isPending}
-          variant="outline"
+            variant="outline"
           size="sm"
         >
           {testConnection.isPending ? (
@@ -244,7 +244,7 @@ export const ERPScheduling = () => {
             <Database className="h-4 w-4 mr-2" />
           )}
           Test Connection
-        </Button>
+          </Button>
       </div>
 
       {/* Task Progress */}
@@ -307,8 +307,8 @@ export const ERPScheduling = () => {
                   }
                 </div>
                 <div className="text-sm text-muted-foreground">Last Location Sync</div>
-              </div>
-            </div>
+        </div>
+      </div>
           ) : (
             <div className="text-center py-4 text-muted-foreground">
               No sync configuration available
@@ -339,7 +339,7 @@ export const ERPScheduling = () => {
               <label htmlFor="forceFullSync" className="text-sm">
                 Force full sync (ignore last sync date)
               </label>
-            </div>
+              </div>
             <Button
               onClick={handleAssetSync}
               disabled={syncAssets.isPending || (currentTaskId && taskStatus?.status === 'PENDING')}
@@ -375,7 +375,7 @@ export const ERPScheduling = () => {
                 <RefreshCw className="h-4 w-4 mr-2" />
               )}
               Start Location Sync
-            </Button>
+                </Button>
           </CardContent>
         </Card>
       </div>
@@ -461,8 +461,8 @@ export const ERPScheduling = () => {
               <h3 className="text-lg font-semibold mb-2">No Sync History</h3>
               <p className="text-sm">
                 No ERP synchronization operations have been performed yet.
-              </p>
-            </div>
+                        </p>
+                      </div>
           )}
         </CardContent>
       </Card>

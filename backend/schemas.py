@@ -355,6 +355,7 @@ class WorkflowDecisionIn(BaseModel):
     comment: Optional[str] = None
     actor_id: Optional[str] = None
     step_token: Optional[str] = None
+    destination_location_id: Optional[str] = None
 
 class OAuthProviderBase(BaseModel):
     name: str

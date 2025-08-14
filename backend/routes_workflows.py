@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Body
 from sqlalchemy.orm import Session
 from db import SessionLocal
-from auth import require_role, require_any_role, require_n8n
+from auth import require_role, require_any_role, require_n8n, get_current_user
 from services.workflow_service import WorkflowService
 from schemas import WorkflowScenarioCreate, WorkflowScenarioOut, WorkflowTriggerIn, WorkflowTriggerOut, WorkflowResolveNextIn, WorkflowResolveNextOut, WorkflowDecisionIn
 
@@ -30,5 +30,21 @@ def resolve_next(body: WorkflowResolveNextIn, db: Session = Depends(get_db)):
 @router.post("/instances/{instance_id}/decision")
 def decision(instance_id: str, body: WorkflowDecisionIn, db: Session = Depends(get_db)):
     # If step_token is provided, workflow service will validate it and infer actor
-    return WorkflowService(db).decide(instance_id, body.step_index, body.actor_id or '', body.action, body.comment, body.step_token)
+    return WorkflowService(db).decide(
+        instance_id,
+        body.step_index,
+        body.actor_id or '',
+        body.action,
+        body.comment,
+        body.step_token,
+        getattr(body, 'destination_location_id', None)
+    )
+
+@router.get("/inbox")
+def inbox(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    return WorkflowService(db).inbox(current_user.id)
+
+@router.get("/instances/{instance_id}")
+def get_instance(instance_id: str, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    return WorkflowService(db).get_instance_details(instance_id)
 

@@ -17,6 +17,9 @@ from models import (
 )
 from config import config
 from services.mailer import send_email
+import logging
+
+logger = logging.getLogger("uvicorn")
 
 class WorkflowService:
     def __init__(self, db: Session):
@@ -54,8 +57,36 @@ class WorkflowService:
         )
         self.db.add(instance)
         self.db.commit()
-        # Internal email-driven workflow: notify first step actors
-        self._notify_next_actors(instance, scenario, business_ref)
+        self.db.refresh(instance)
+
+        # Build context from business ref (asset transfer)
+        at = self.db.query(AssetTransfer).filter(AssetTransfer.transfer_number == business_ref).first()
+        ctx = {
+            'source_branch_id': getattr(at, 'source_branch_id', None),
+            'destination_branch_id': getattr(at, 'destination_branch_id', None),
+        }
+
+        # Pre-create planned steps with assigned actors
+        steps = (scenario.rules or {}).get('steps', [])
+        steps_def = [step for step in steps if not step.get("notify_only", False)]
+        for idx, s in enumerate(steps_def):
+            actors = self._resolve_actors(s.get('actor'), s.get('scope', 'receiving'), ctx)
+            assigned_ids = [a['id'] for a in actors if a.get('id')]
+            step_row = WorkflowStep(
+                id=str(uuid.uuid4()),
+                instance_id=instance.id,
+                step_index=idx,
+                actor_type=s.get('actor', ''),
+                scope=s.get('scope', 'receiving'),
+                assigned_actor_ids=assigned_ids,
+                status='pending',
+                is_current=(idx == (current_step or 0)),
+            )
+            self.db.add(step_row)
+        self.db.commit()
+
+        # Enter current step: create inbox and notify
+        self._enter_step(instance, instance.current_step)
         return { 'instance_id': instance.id, 'status': instance.status }
 
     def resolve_next(self, scenario_name: str, business_ref: str, current_step: int, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -71,7 +102,7 @@ class WorkflowService:
         actors = self._resolve_actors(actor_type, scope, context or {})
         return { 'step_index': current_step, 'actors': actors, 'end': False }
 
-    def decide(self, instance_id: str, step_index: int, actor_id: str, action: str, comment: Optional[str], step_token: Optional[str] = None) -> Dict[str, Any]:
+    def decide(self, instance_id: str, step_index: int, actor_id: str, action: str, comment: Optional[str], step_token: Optional[str] = None, destination_location_id: Optional[str] = None) -> Dict[str, Any]:
         instance = self.db.query(WorkflowInstance).filter(WorkflowInstance.id == instance_id).first()
         if not instance:
             raise HTTPException(status_code=404, detail='Instance not found')
@@ -87,20 +118,50 @@ class WorkflowService:
                 actor_id = token_actor or actor_id
             except Exception:
                 raise HTTPException(status_code=400, detail='Invalid step token')
-        # Record step
-        wf_step = WorkflowStep(
-            id=str(uuid.uuid4()),
-            instance_id=instance.id,
-            step_index=step_index,
-            actor_type='',
-            assigned_actor_ids=None,
-            status='approved' if action == 'approve' else 'rejected',
-            decided_by=actor_id,
-        )
-        self.db.add(wf_step)
-        # Advance or finalize
+        logger.info(f"Deciding on {instance.scenario_name}-{instance.current_step} with business ref {instance.business_ref} for step {step_index} with actor {actor_id} and action {action}")
+
+        # Enforce turn-taking and assignment
+        if (instance.current_step or 0) != int(step_index):
+            raise HTTPException(status_code=409, detail='Not current step')
+        step_row = self.db.query(WorkflowStep).filter(WorkflowStep.instance_id == instance.id, WorkflowStep.step_index == step_index).first()
+        if not step_row:
+            raise HTTPException(status_code=404, detail='Step not found')
+        assigned_ids = set(step_row.assigned_actor_ids or [])
+        if actor_id not in assigned_ids:
+            raise HTTPException(status_code=403, detail='Not your turn')
+
+        # Persist destination location when receiving approval includes a location
         scenario = self.db.query(WorkflowScenario).filter(WorkflowScenario.name == instance.scenario_name).first()
-        total_steps = len((scenario.rules or {}).get('steps', []))
+        all_steps = (scenario.rules or {}).get('steps', []) if scenario else []
+        steps_def = [step for step in all_steps if not step.get("notify_only", False)]
+        step_def = steps_def[step_index] if step_index < len(steps_def) else {}
+        if action == 'approve' and destination_location_id and step_row.actor_type in ('branch_manager', 'finance_manager') and step_def.get('scope') == 'receiving':
+            at = self.db.query(AssetTransfer).filter(AssetTransfer.transfer_number == instance.business_ref).first()
+            if at:
+                loc = self.db.query(Location).filter(Location.id == destination_location_id).first()
+                if not loc:
+                    raise HTTPException(status_code=422, detail='Invalid destination location')
+                if at.destination_branch_id and loc.branch_id != at.destination_branch_id:
+                    raise HTTPException(status_code=422, detail='Destination location must be in destination branch')
+                at.destination_location_id = destination_location_id
+                self.db.add(at)
+
+        # Record decision on the planned step row
+        step_row.status = 'approved' if action == 'approve' else 'rejected'
+        step_row.decided_by = actor_id
+        step_row.decided_at = datetime.utcnow()
+        step_row.is_current = False
+        self.db.add(step_row)
+
+        # Close inbox entries for this step
+        from models import WorkflowInbox
+        self.db.query(WorkflowInbox).filter(
+            WorkflowInbox.instance_id == instance.id,
+            WorkflowInbox.step_index == step_index
+        ).update({ 'is_active': False, 'read_at': datetime.utcnow() })
+
+        # Advance or finalize
+        total_steps = len(steps_def)
         if action == 'reject':
             instance.status = 'rejected'
         else:
@@ -109,27 +170,19 @@ class WorkflowService:
                 instance.status = 'approved'
             else:
                 instance.current_step = next_step
+                self._enter_step(instance, next_step)
         self.db.commit()
-        # Advance emails if pending, include next_step / final notifications
+
+        # Build response
         next_payload: Dict[str, Any] = { 'status': instance.status, 'current_step': instance.current_step }
         if instance.status == 'pending':
-            scenario = self.db.query(WorkflowScenario).filter(WorkflowScenario.name == instance.scenario_name).first()
-            # Email next actors
-            self._notify_next_actors(instance, scenario, instance.business_ref)
-            steps = (scenario.rules or {}).get('steps', [])
-            next_idx = instance.current_step or 0
-            if next_idx < len(steps):
-                step = steps[next_idx]
-                scope = step.get('scope', 'receiving')
-                actors = self._resolve_actors(step.get('actor'), scope, {
-                    'source_location_id': None,
-                    'destination_location_id': None,
-                })
-                next_payload['next_step'] = {
-                    'step_index': next_idx,
-                    'actors': actors,
-                    'notify_only': bool(step.get('notify_only')),
-                }
+            next_def = steps_def[instance.current_step]
+            next_step_row = self.db.query(WorkflowStep).filter(WorkflowStep.instance_id == instance.id, WorkflowStep.step_index == instance.current_step).first()
+            next_payload['next_step'] = {
+                'step_index': instance.current_step,
+                'actors': [{'id': uid} for uid in (getattr(next_step_row, 'assigned_actor_ids', []) or [])],
+                'notify_only': bool(next_def.get('notify_only')),
+            }
         else:
             next_payload['notifications'] = self._final_notifications(instance)
         return next_payload
@@ -140,37 +193,166 @@ class WorkflowService:
             notifs.append({ 'id': 'requester', 'email': instance.requester_email })
         return notifs
 
-    def _notify_next_actors(self, instance: WorkflowInstance, scenario: WorkflowScenario, business_ref: str) -> None:
-        steps = (scenario.rules or {}).get('steps', [])
-        idx = instance.current_step or 0
-        if idx >= len(steps):
-            return
-        step = steps[idx]
-        scope = step.get('scope', 'receiving')
+    def inbox(self, user_id: str) -> List[Dict[str, Any]]:
+        # Inbox is built from WorkflowInbox rows
+        from models import WorkflowInbox
+        rows = self.db.query(WorkflowInbox).filter(WorkflowInbox.user_id == user_id, WorkflowInbox.is_active == True).all()
+        results: List[Dict[str, Any]] = []
+        for r in rows:
+            inst = self.db.query(WorkflowInstance).filter(WorkflowInstance.id == r.instance_id, WorkflowInstance.status == 'pending').first()
+            if not inst:
+                continue
+            at = self.db.query(AssetTransfer).filter(AssetTransfer.transfer_number == inst.business_ref).first()
+            source_branch_name = None
+            destination_branch_name = None
+            created_at = getattr(at, 'created_at', None) if at else None
+            if at and getattr(at, 'source_branch_id', None):
+                sb = self.db.query(Branch).filter(Branch.id == at.source_branch_id).first()
+                source_branch_name = getattr(sb, 'name', None)
+            if at and getattr(at, 'destination_branch_id', None):
+                dbb = self.db.query(Branch).filter(Branch.id == at.destination_branch_id).first()
+                destination_branch_name = getattr(dbb, 'name', None)
+            step_row = self.db.query(WorkflowStep).filter(WorkflowStep.instance_id == inst.id, WorkflowStep.step_index == r.step_index).first()
+            # scope lookup from scenario
+            scenario = self.db.query(WorkflowScenario).filter(WorkflowScenario.name == inst.scenario_name).first()
+            scope = (scenario.rules or {}).get('steps', [])[r.step_index].get('scope', 'receiving') if scenario else 'receiving'
+            results.append({
+                'instance_id': inst.id,
+                'scenario_name': inst.scenario_name,
+                'business_ref': inst.business_ref,
+                'current_step': r.step_index,
+                'actor': getattr(step_row, 'actor_type', None),
+                'scope': scope,
+                'created_at': created_at,
+                'workflow_status': inst.status,
+                'source_branch_name': source_branch_name,
+                'destination_branch_name': destination_branch_name,
+            })
+        return results
+
+    def get_instance_details(self, instance_id: str) -> Dict[str, Any]:
+        inst = self.db.query(WorkflowInstance).filter(WorkflowInstance.id == instance_id).first()
+        if not inst:
+            raise HTTPException(status_code=404, detail='Instance not found')
+        data: Dict[str, Any] = {
+            'instance_id': inst.id,
+            'scenario_name': inst.scenario_name,
+            'business_ref': inst.business_ref,
+            'current_step': inst.current_step,
+            'status': inst.status,
+        }
+        # If this is an asset transfer workflow, include transfer context
+        at = self.db.query(AssetTransfer).filter(AssetTransfer.transfer_number == inst.business_ref).first()
+        if at:
+            # Resolve branches and requester
+            src_branch = self.db.query(Branch).filter(Branch.id == getattr(at, 'source_branch_id', None)).first() if getattr(at, 'source_branch_id', None) else None
+            dst_branch = self.db.query(Branch).filter(Branch.id == getattr(at, 'destination_branch_id', None)).first() if getattr(at, 'destination_branch_id', None) else None
+            requester = self.db.query(User).filter(User.id == at.created_by).first() if getattr(at, 'created_by', None) else None
+            # Resolve items with asset names
+            items = self.db.query(AssetTransferItem).filter(AssetTransferItem.transfer_id == at.id).all()
+            detailed_items: List[Dict[str, Any]] = []
+            for itm in items:
+                asset = self.db.query(Asset).filter(Asset.id == itm.asset_id).first()
+                detailed_items.append({
+                    'barcode': getattr(itm, 'barcode', ''),
+                    'name': getattr(asset, 'name', ''),
+                })
+            data['transfer'] = {
+                'id': at.id,
+                'transfer_number': at.transfer_number,
+                'source_branch_id': getattr(at, 'source_branch_id', None),
+                'destination_branch_id': getattr(at, 'destination_branch_id', None),
+                'destination_location_id': getattr(at, 'destination_location_id', None),
+                'created_at': at.created_at,
+                'source_branch_name': getattr(src_branch, 'name', None),
+                'destination_branch_name': getattr(dst_branch, 'name', None),
+                'requester': {
+                    'id': getattr(requester, 'id', None),
+                    'email': getattr(requester, 'email', None),
+                    'display_name': getattr(requester, 'display_name', None),
+                },
+                'items': detailed_items,
+            }
+        # Planned step history and expected actors
+        scenario = self.db.query(WorkflowScenario).filter(WorkflowScenario.name == inst.scenario_name).first()
+        steps_def: List[Dict[str, Any]] = (scenario.rules or {}).get('steps', []) if scenario else []
+        history = self.db.query(WorkflowStep).filter(WorkflowStep.instance_id == inst.id).order_by(WorkflowStep.step_index.asc()).all()
+        history_out: List[Dict[str, Any]] = []
+        for h in history:
+            user = self.db.query(User).filter(User.id == h.decided_by).first() if h.decided_by else None
+            history_out.append({
+                'step_index': h.step_index,
+                'actor_type': h.actor_type,
+                'status': h.status,
+                'scope': h.scope,
+                'decided_by': h.decided_by,
+                'decided_by_name': getattr(user, 'email', None),
+                'decided_at': h.decided_at,
+            })
+        # Expected remains same as planned with assigned actors
+        expected: List[Dict[str, Any]] = []
+        """ for idx, s in enumerate(steps_def):
+            step_row = next((x for x in history if x.step_index == idx), None)
+            actor_ids = (getattr(step_row, 'assigned_actor_ids', []) or [])
+            actors_out: List[Dict[str, Any]] = []
+            for uid in actor_ids:
+                u = self.db.query(User).filter(User.id == uid).first()
+                actors_out.append({'id': uid, 'email': getattr(u, 'email', None)})
+            expected.append({
+                'step_index': idx,
+                'actor_type': s.get('actor'),
+                'scope': s.get('scope', 'receiving'),
+                'actors': actors_out,
+                'is_current': bool(getattr(step_row, 'is_current', False)),
+                'status': getattr(step_row, 'status', 'pending'),
+            }) """
+        data['history'] = history_out
+        data['expected'] = expected
+        return data
+
+    def _enter_step(self, instance: WorkflowInstance, step_index: int) -> None:
+        # Mark only this step as current
+        self.db.query(WorkflowStep).filter(WorkflowStep.instance_id == instance.id).update({'is_current': False})
+        self.db.query(WorkflowStep).filter(WorkflowStep.instance_id == instance.id, WorkflowStep.step_index == step_index).update({'is_current': True})
+        self.db.commit()
+        # Create inbox entries and notify assigned actors
+        step_row = self.db.query(WorkflowStep).filter(WorkflowStep.instance_id == instance.id, WorkflowStep.step_index == step_index).first()
+        assigned = list(step_row.assigned_actor_ids or [])
+        from models import WorkflowInbox
+        # Deactivate previous inbox rows for this step (idempotency)
+        self.db.query(WorkflowInbox).filter(WorkflowInbox.instance_id == instance.id, WorkflowInbox.step_index == step_index).update({'is_active': False})
+        self.db.commit()
+        for uid in assigned:
+            inbox = WorkflowInbox(
+                id=str(uuid.uuid4()),
+                instance_id=instance.id,
+                step_index=step_index,
+                user_id=uid,
+                is_active=True,
+            )
+            self.db.add(inbox)
+        self.db.commit()
+        self._notify_step_assigned(instance, step_index, assigned)
+
+    def _notify_step_assigned(self, instance: WorkflowInstance, step_index: int, assigned_user_ids: List[str]) -> None:
         # Build transfer context
-        at = self.db.query(AssetTransfer).filter(AssetTransfer.transfer_number == business_ref).first()
+        at = self.db.query(AssetTransfer).filter(AssetTransfer.transfer_number == instance.business_ref).first()
         if not at:
             return
-        src_branch_id = self._get_branch_id_for_location(at.source_location_id)
-        dst_branch_id = self._get_branch_id_for_location(at.destination_location_id)
-        src_branch = self.db.query(Branch).filter(Branch.id == src_branch_id).first() if src_branch_id else None
-        dst_branch = self.db.query(Branch).filter(Branch.id == dst_branch_id).first() if dst_branch_id else None
+        src_branch = self.db.query(Branch).filter(Branch.id == at.source_branch_id).first() if at.source_branch_id else None
+        dst_branch = self.db.query(Branch).filter(Branch.id == at.destination_branch_id).first() if at.destination_branch_id else None
         requester = self.db.query(User).filter(User.id == at.created_by).first()
         items = self.db.query(AssetTransferItem).filter(AssetTransferItem.transfer_id == at.id).all()
-        actors = self._resolve_actors(step.get('actor'), scope, {
-            'source_location_id': at.source_location_id,
-            'destination_location_id': at.destination_location_id,
-        })
-        for a in actors:
-            token = jwt.encode({ 'inst': instance.id, 'step': idx, 'actor': a['id'], 'exp': datetime.utcnow() + timedelta(minutes=60) }, config.SECRET_KEY, algorithm=config.ALGORITHM)
-            link = f"{config.FRONTEND_URL}/approvals/{instance.id}?step={idx}&step_token={token}"
-            html = self._build_email_html(business_ref, requester, src_branch, dst_branch, items, link)
-            email = a.get('email')
-            if not email:
-                user = self.db.query(User).filter(User.id == a['id']).first()
-                email = user.email if user else None
-            if email:
-                send_email(email, f"Approval required: {business_ref}", html)
+        for uid in assigned_user_ids:
+            try:
+                token = jwt.encode({ 'inst': instance.id, 'step': step_index, 'actor': uid, 'exp': datetime.utcnow() + timedelta(minutes=60) }, config.SECRET_KEY, algorithm=config.ALGORITHM)
+                link = f"{config.FRONTEND_URL}/approvals/{instance.id}?step={step_index}&step_token={token}"
+                html = self._build_email_html(instance.business_ref, requester, src_branch, dst_branch, items, link)
+                user = self.db.query(User).filter(User.id == uid).first()
+                if user and user.email:
+                    send_email(user.email, f"Approval required: {instance.business_ref}", html)
+            except Exception as e:
+                logger.error(f"Failed to send approval email for {instance.business_ref} to actor {uid}: {e}")
 
     def _build_email_html(self, business_ref: str, requester: Any, src_branch: Any, dst_branch: Any, items: List[Any], link: str) -> str:
         header_rows = f"""
@@ -197,12 +379,9 @@ class WorkflowService:
         # Only three roles in this workflow scope: finance_manager, branch_manager, accounting_manager
         # Scope for branch/finance managers: 'initiating' (source branch) or 'receiving' (destination branch)
         if actor_type in ('branch_manager', 'finance_manager'):
-            loc_id = ctx.get('source_location_id') if scope == 'initiating' else ctx.get('destination_location_id')
-            if not loc_id:
-                return []
-            branch_id = self._get_branch_id_for_location(loc_id)
+            branch_id = ctx.get('source_branch_id') if scope == 'initiating' else ctx.get('destination_branch_id')
             if not branch_id:
-                return []
+                return []            
             branch = self.db.query(Branch).filter(Branch.id == branch_id).first()
             if not branch:
                 return []
@@ -212,10 +391,7 @@ class WorkflowService:
             user = self.db.query(User).filter(User.id == user_id).first()
             return [{ 'id': user_id, 'email': user.email if user else None }]
         if actor_type == 'accounting_manager':
-            loc_id = ctx.get('destination_location_id')
-            if not loc_id:
-                return []
-            branch_id = self._get_branch_id_for_location(loc_id)
+            branch_id = ctx.get('destination_branch_id')
             if not branch_id:
                 return []
             branch = self.db.query(Branch).filter(Branch.id == branch_id).first()

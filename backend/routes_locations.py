@@ -84,13 +84,18 @@ def delete_region(
 @router.get("/branches")
 def list_branches(
     region_id: Optional[str] = None,
+    country_id: Optional[str] = None,
+    initiating: Optional[bool] = False,
+    bypass_access: Optional[bool] = False,
     search: Optional[str] = None,
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    return LocationService(db).list_branches(user_id=current_user.id, region_id=region_id, search=search, skip=skip, limit=limit)
+    if initiating:
+        return LocationService(db).list_initiating_branches(current_user.id)
+    return LocationService(db).list_branches(user_id=current_user.id, region_id=region_id, search=search, skip=skip, limit=limit, country_id=country_id, bypass_access=bypass_access)
 
 @router.post("/branches")
 def create_branch(

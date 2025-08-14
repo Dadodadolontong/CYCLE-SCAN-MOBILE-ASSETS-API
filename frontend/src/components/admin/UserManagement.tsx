@@ -303,6 +303,7 @@ export const UserManagement = () => {
                 <SelectItem value="accounting_manager">Accounting Managers</SelectItem>
                 <SelectItem value="controller">Controllers</SelectItem>
                 <SelectItem value="manager">Managers</SelectItem>
+                <SelectItem value="branch_manager">Branch Managers</SelectItem>
                 <SelectItem value="user">Users</SelectItem>
                 <SelectItem value="guest">Guests</SelectItem>
               </SelectContent>
@@ -371,6 +372,7 @@ export const UserManagement = () => {
                             <SelectItem value="manager">Manager</SelectItem>
                             <SelectItem value="controller">Controller</SelectItem>
                             <SelectItem value="accounting_manager">Accounting Manager</SelectItem>
+                            <SelectItem value="branch_manager">Branch Managers</SelectItem>
                             <SelectItem value="admin">Administrator</SelectItem>
                             <SelectItem value="guest">Guest</SelectItem>
                           </SelectContent>
@@ -445,6 +447,7 @@ export const UserManagement = () => {
                               <SelectItem value="accounting_manager">Accounting Manager</SelectItem>
                               <SelectItem value="controller">Controller</SelectItem>
                               <SelectItem value="manager">Manager</SelectItem>
+                              <SelectItem value="branch_manager">Branch Managers</SelectItem>
                               <SelectItem value="user">User</SelectItem>
                               <SelectItem value="guest">Guest</SelectItem>
                             </SelectContent>
@@ -644,6 +647,7 @@ export const UserManagement = () => {
                   <SelectItem value="manager">Manager</SelectItem>
                   <SelectItem value="controller">Controller</SelectItem>
                   <SelectItem value="accounting_manager">Accounting Manager</SelectItem>
+                  <SelectItem value="branch_manager">Branch Managers</SelectItem>
                   <SelectItem value="admin">Administrator</SelectItem>
                   <SelectItem value="guest">Guest</SelectItem>
                 </SelectContent>

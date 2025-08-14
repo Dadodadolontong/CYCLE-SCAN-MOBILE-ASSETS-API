@@ -253,16 +253,24 @@ class FastAPIClient {
   }
 
   // Asset Transfers
+  async listAssetTransfers(skip: number = 0, limit: number = 50): Promise<any[]> {
+    return this.get(`/asset-transfers?skip=${skip}&limit=${limit}`);
+  }
+  async getAssetTransfer(transferId: string): Promise<any> {
+    return this.get(`/asset-transfers/${encodeURIComponent(transferId)}`);
+  }
   async createAssetTransfer(params: {
-    source_location_id: string;
-    destination_location_id: string;
+    source_branch_id: string;
+    destination_branch_id: string;
     barcodes: string[];
+    remarks?: string;
     photos?: File[];
   }): Promise<{ id: string; transfer_number: string; status: string; created_at: string }> {
     const form = new FormData();
-    form.append('source_location_id', params.source_location_id);
-    form.append('destination_location_id', params.destination_location_id);
+    form.append('source_branch_id', params.source_branch_id);
+    form.append('destination_branch_id', params.destination_branch_id);
     form.append('barcodes', JSON.stringify(params.barcodes));
+    if (params.remarks) form.append('remarks', params.remarks);
     (params.photos || []).slice(0, 3).forEach((f, idx) => form.append(`photo${idx + 1}`, f));
     return this.post('/asset-transfers', form);
   }
@@ -296,10 +304,29 @@ class FastAPIClient {
     return this.get('/erp/locations-mapping');
   }
 
+  // Location/Branch helpers for transfers
+  async getInitiatingBranches(): Promise<any[]> {
+    return this.get('/locations/branches?initiating=true');
+  }
+  async getBranchesByCountry(countryId: string): Promise<any[]> {
+    return this.get(`/locations/branches?country_id=${encodeURIComponent(countryId)}`);
+  }
+  async getLocationsByBranch(branchId: string): Promise<any[]> {
+    return this.get(`/locations?branch_id=${encodeURIComponent(branchId)}&limit=1000`);
+  }
+
   // Test method to simulate session timeout (for development/testing)
   async testSessionTimeout(): Promise<void> {
     // This endpoint should return 401 to test session timeout handling
     return this.get('/auth/test-timeout');
+  }
+
+  // Workflow
+  async getWorkflowInbox(): Promise<any[]> {
+    return this.get('/workflows/inbox');
+  }
+  async getWorkflowInstance(instanceId: string): Promise<any> {
+    return this.get(`/workflows/instances/${encodeURIComponent(instanceId)}`);
   }
 }
 

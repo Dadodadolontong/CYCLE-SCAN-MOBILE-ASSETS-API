@@ -773,7 +773,7 @@ export const LocationHierarchyManagement = () => {
                         onChange={(e) => setBranchAssign(prev => ({ ...prev, financeManagerId: e.target.value || null }))}
                       >
                         <option value="">Unassigned</option>
-                        {usersWithRoles.filter((u: any) => u.role === 'finance_manager').map((u: any) => (
+                        {usersWithRoles.filter((u: any) => u.role === 'manager').map((u: any) => (
                           <option key={u.id} value={u.id}>{u.display_name}</option>
                         ))}
                       </select>

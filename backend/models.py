@@ -280,11 +280,13 @@ class WorkflowStep(Base):
     instance_id = Column(String(36), ForeignKey('workflow_instances.id', ondelete='CASCADE'), nullable=False)
     step_index = Column(Integer, nullable=False)
     actor_type = Column(String(64), nullable=False)
+    scope = Column(String(64), nullable=False)
     assigned_actor_ids = Column(JSON)  # [user_ids]
     status = Column(String(32), default='pending')
     decided_by = Column(String(36))
     decided_at = Column(DateTime)
     data = Column(JSON)
+    is_current = Column(Boolean, default=False, nullable=False)
 
 class UserSession(Base):
     __tablename__ = 'user_sessions'
@@ -318,11 +320,16 @@ class AssetTransfer(Base):
     __tablename__ = 'asset_transfers'
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     transfer_number = Column(String(64), unique=True, nullable=False)
-    source_location_id = Column(String(36), ForeignKey('locations.id'), nullable=False)
-    destination_location_id = Column(String(36), ForeignKey('locations.id'), nullable=False)
+    # Branch-level fields
+    source_branch_id = Column(String(36), ForeignKey('branches.id'), nullable=True)
+    destination_branch_id = Column(String(36), ForeignKey('branches.id'), nullable=True)
+    # Location-level fields
+    source_location_id = Column(String(36), ForeignKey('locations.id'), nullable=True)
+    destination_location_id = Column(String(36), ForeignKey('locations.id'), nullable=True)
     created_by = Column(String(36), ForeignKey('users.id'), nullable=False)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     status = Column(String(32), default='pending')
+    remarks = Column(String(1024))
     items = relationship('AssetTransferItem', back_populates='transfer', cascade='all, delete-orphan')
     approvals = relationship('AssetTransferApproval', back_populates='transfer', cascade='all, delete-orphan')
 
@@ -343,3 +350,13 @@ class AssetTransferApproval(Base):
     status = Column(String(32), default='pending')  # pending, approved, rejected
     approved_at = Column(DateTime)
     transfer = relationship('AssetTransfer', back_populates='approvals') 
+
+class WorkflowInbox(Base):
+    __tablename__ = 'workflow_inbox'
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    instance_id = Column(String(36), ForeignKey('workflow_instances.id', ondelete='CASCADE'), nullable=False, index=True)
+    step_index = Column(Integer, nullable=False)
+    user_id = Column(String(36), ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    delivered_at = Column(DateTime, server_default=func.now(), nullable=False)
+    read_at = Column(DateTime)
+    is_active = Column(Boolean, default=True, nullable=False) 

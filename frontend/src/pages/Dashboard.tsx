@@ -15,6 +15,8 @@ import { useCategories } from "@/hooks/useCategories";
 import { useUserRole } from "@/hooks/useUserRole";
 import Pagination from "@/components/Pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useAssetTransfers } from "@/hooks/useAssetTransfers";
+import { useWorkflowInbox } from "@/hooks/useWorkflowInbox";
 
 const Dashboard = () => {
   const { user, setUser } = useAuth();
@@ -52,8 +54,12 @@ const Dashboard = () => {
     }
   }, [location, setUser]);
 
+  // Asset transfers and approvals data
+  const { data: transfers = [], isLoading: transfersLoading } = useAssetTransfers();
+  const { data: inbox = [], isLoading: inboxLoading } = useWorkflowInbox();
+
   // Loading states
-  const isLoading = tasksLoading || assetsLoading || locationsLoading || categoriesLoading || assetCountLoading;
+  const isLoading = tasksLoading || assetsLoading || locationsLoading || categoriesLoading || assetCountLoading || transfersLoading || inboxLoading;
   const hasErrors = tasksError || assetsError || locationsError || categoriesError || assetCountError;
 
   // Computed values
@@ -198,98 +204,131 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Button 
-            onClick={() => navigate('/create-task')} 
-            size="lg" 
-            className="h-20 text-lg"
-          >
-            <CalendarDays className="mr-2 h-5 w-5" />
-            Create Cycle Count Task
-          </Button>
-          {/* Create Asset Transfer button for managers */}
-          {userRole === 'manager' && (
-            <Button
-              onClick={() => navigate('/asset-transfer/create')}
-              size="lg"
-              className="h-20 text-lg"
-              variant="secondary"
-            >
-              <Package className="mr-2 h-5 w-5" />
-              Create Asset Transfer
-            </Button>
-          )}
-          <Button 
-            size="lg" 
-            className="h-20 text-lg"
-            disabled
-          >
-            <Package className="mr-2 h-5 w-5" />
-            Asset Reports
-          </Button>
-        </div>
+        {/* Domain tabs */}
+        <Tabs defaultValue="cycle">
+          <TabsList className="mb-4">
+            <TabsTrigger value="cycle">Cycle Count</TabsTrigger>
+            <TabsTrigger value="transfer">Asset Transfers</TabsTrigger>
+            <TabsTrigger value="approvals">Approvals</TabsTrigger>
+            <TabsTrigger value="reports">Reports</TabsTrigger>
+          </TabsList>
 
-        {/* Tasks Overview */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Cycle Count Tasks</CardTitle>
-            <CardDescription>
-              Overview of your cycle counting activities
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-4 flex items-center gap-4">
-              <label htmlFor="status-filter" className="text-sm font-medium">Task Status:</label>
-              <Select value="all" onValueChange={value => { }}>
-                <SelectTrigger className="w-40" id="status-filter">
-                  <SelectValue>All</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
+          <TabsContent value="cycle">
+            <div className="mb-4">
+              <Button onClick={() => navigate('/create-task')} size="sm">
+                <CalendarDays className="mr-2 h-4 w-4" /> Create Cycle Count Task
+              </Button>
             </div>
-            <div className="space-y-4">
-              {tasks.map((task) => (
-                <div key={task.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="space-y-1">
-                    <h4 className="font-medium">{task.name}</h4>
-                    <p className="text-sm text-muted-foreground">{task.description}</p>
-                    <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      <span>Started {task.started_at ? new Date(task.started_at).toLocaleDateString() : 'Not started'}</span>
+            <Card>
+              <CardHeader>
+                <CardTitle>Cycle Count Tasks</CardTitle>
+                <CardDescription>Overview of your cycle counting activities</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {tasks.map((task) => (
+                    <div key={task.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="space-y-1">
+                        <h4 className="font-medium">{task.name}</h4>
+                        <p className="text-sm text-muted-foreground">{task.description}</p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {getStatusBadge(task.status)}
+                        <Button variant="outline" size="sm" onClick={() => navigate(`/cycle-count/${task.id}`)}>
+                          {task.status === 'active' ? 'Resume Task' : 'View Task'}
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    {getStatusBadge(task.status)}
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => navigate(`/cycle-count/${task.id}`)}
-                    >
-                      {task.status === 'active' ? 'Resume Task' : 'View Task'}
-                    </Button>
-                  </div>
+                  ))}
+                  {tasks.length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">No tasks found</p>
+                  )}
                 </div>
-              ))}
-              <Pagination
-                currentPage={1}
-                totalItems={tasks.length}
-                pageSize={20}
-                onPageChange={() => {}}
-              />
-              {tasks.length === 0 && (
-                <p className="text-center text-muted-foreground py-8">No tasks found for this status</p>
-              )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="transfer">
+            <div className="mb-4">
+              <Button onClick={() => navigate('/asset-transfer/create')} size="sm" variant="secondary">
+                <Package className="mr-2 h-4 w-4" /> Create Asset Transfer
+              </Button>
             </div>
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Asset Transfers</CardTitle>
+                <CardDescription>Transfers you created or need to act on</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {transfers.map((t: any) => (
+                    <div key={t.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="space-y-1">
+                        <h4 className="font-medium">{t.transfer_number}</h4>
+                        <p className="text-xs text-muted-foreground">{new Date(t.created_at).toLocaleString()}</p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {getStatusBadge(t.status)}
+                        <Button variant="outline" size="sm" onClick={() => navigate(`/approvals/${t.instance_id || t.id}`)}>View</Button>
+                      </div>
+                    </div>
+                  ))}
+                  {transfers.length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">No transfers</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="approvals">
+            <Card>
+              <CardHeader>
+                <CardTitle>Pending Approvals</CardTitle>
+                <CardDescription>Items awaiting your action</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {inbox.map((i: any) => (
+                    <div key={i.instance_id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="space-y-1">
+                        <h4 className="font-medium">{i.business_ref}</h4>
+                        <p className="text-xs text-muted-foreground">
+                          {i.source_branch_name || '-'} → {i.destination_branch_name || '-'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Created: {i.created_at ? new Date(i.created_at).toLocaleString() : '-'} • Status: {i.workflow_status}
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button variant="outline" size="sm" onClick={() => navigate(`/approvals/${i.instance_id}`)}>Open</Button>
+                      </div>
+                    </div>
+                  ))}
+                  {inbox.length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">No pending approvals</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="reports">
+            <Card>
+              <CardHeader>
+                <CardTitle>Asset Reports</CardTitle>
+                <CardDescription>Available reports</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="list-disc pl-6 text-sm text-muted-foreground">
+                  <li>Count Summary (coming soon)</li>
+                  <li>Transfer History (coming soon)</li>
+                  <li>Discrepancy Report (coming soon)</li>
+                </ul>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         {/* Development Test Section - Only show in development */}
         {/* {import.meta.env.DEV && (

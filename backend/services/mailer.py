@@ -2,9 +2,13 @@ from email.message import EmailMessage
 import smtplib
 import ssl
 from config import config
+import logging
+
+logger = logging.getLogger(__name__)
 
 def send_email(to: str, subject: str, html: str):
     if not config.SMTP_HOST or not config.SMTP_FROM:
+        logger.warning("SMTP not configured; skipping email send")
         return
     msg = EmailMessage()
     msg['From'] = config.SMTP_FROM
