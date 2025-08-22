@@ -116,6 +116,12 @@ npm run dev
 3. The system will queue the task and return a task ID
 4. The frontend will automatically monitor the task progress
 
+### Syncing Approved Asset Transfers
+
+- Transfers are pushed to Oracle automatically when the approval workflow reaches the final approved state.
+- A Celery task `tasks.erp_tasks.sync_asset_transfer_to_oracle` is enqueued with the `transfer_id`.
+- You can manually retry via API: `POST /asset-transfers/{transfer_id}/sync`.
+
 ### Monitoring Task Progress
 
 - **Real-time Updates**: The frontend polls the task status every 2 seconds
@@ -136,6 +142,9 @@ npm run dev
 ```http
 POST /erp/sync-assets?force_full_sync=false
 POST /erp/sync-locations
+
+# Manually retry a transfer sync
+POST /asset-transfers/{transfer_id}/sync
 ```
 
 Response:

@@ -148,6 +148,7 @@ rate_limits             # API rate limiting
 #### 2.4.2 Background Tasks
 - **ERP Asset Sync**: Synchronize assets from Oracle
 - **ERP Location Sync**: Synchronize locations from Oracle
+- **ERP Transfer Sync**: Push approved asset transfers to Oracle and mark completed
 - **Data Processing**: Large dataset operations
 - **Report Generation**: Complex report calculations
 
@@ -170,6 +171,13 @@ User Login → OAuth/Password → JWT Token → API Access
 ```
 
 #### 3.1.3 Cycle Count Flow
+#### 3.1.4 Approved Asset Transfer ERP Sync Flow
+```
+User approves transfer → Workflow approved → Celery task enqueued →
+ERP Integration Service → Oracle stored procedure call → Commit →
+Update `asset_transfers.status=completed` → Sync log updated
+```
+
 ```
 Task Creation → Assignment → Execution → Review → Completion
       ↓           ↓           ↓         ↓         ↓
@@ -237,6 +245,16 @@ ERP Import → Asset Creation → Location Assignment → Cycle Count → Transf
 - **Error Handling**: Robust error handling and recovery
 
 #### 5.1.2 Integration Patterns
+#### 5.1.3 Transfer Location Update Pattern
+```
+App DB (approved transfer) → Background Task → Oracle PL/SQL Procedure
+   ↓
+Validate transfer + items + mapped locations
+   ↓
+Call `XDXG_FAT_ONLINE_PKG.fat_transfer_loc(erp_asset_id, erp_location_id, ou, cc, out_result, out_status)`
+   ↓
+On success: mark transfer completed; on error: log failure
+```
 ```
 Oracle ERP → Data Extraction → Transformation → Loading → Application DB
      ↓           ↓                ↓            ↓           ↓

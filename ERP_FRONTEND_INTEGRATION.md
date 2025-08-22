@@ -81,6 +81,7 @@ The frontend integrates with these backend endpoints:
 - `POST /erp/sync-assets` - Sync assets from Oracle
 - `POST /erp/sync-locations` - Sync locations from Oracle
 - `GET /erp/locations-mapping` - Get location mappings
+- `POST /asset-transfers/{transfer_id}/sync` - Manually trigger ERP push for an approved transfer (admin-only)
 
 ### Authentication:
 All ERP endpoints require admin role authentication.

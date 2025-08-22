@@ -107,6 +107,7 @@ The Asset Management System is a comprehensive web-based application designed to
 - **FR-TRANSFER-002**: System shall implement approval workflows for transfers
 - **FR-TRANSFER-003**: System shall track transfer status and history
 - **FR-TRANSFER-004**: System shall support bulk asset transfers
+ - **FR-TRANSFER-005**: Upon final approval, system shall automatically sync the transfer to Oracle ERP in the background and mark the transfer as completed on success; failures shall be logged and available for retry.
 
 ### 4.7 Reporting & Analytics
 - **FR-REPORT-001**: System shall generate asset inventory reports
@@ -163,6 +164,7 @@ The Asset Management System is a comprehensive web-based application designed to
 
 ### 6.3 Data Requirements
 - **DR-001**: Asset data synchronization with ERP system
+ - **DR-001a**: Transfer location updates must call Oracle ERP with asset and destination ERP location IDs and record the result per transfer
 - **DR-002**: Location hierarchy data management
 - **DR-003**: User and role data management
 - **DR-004**: Audit trail and logging data

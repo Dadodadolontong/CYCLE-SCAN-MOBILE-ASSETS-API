@@ -168,6 +168,23 @@ Get current sync configuration and last sync date.
 ```
 
 ### 5. Get Locations Mapping
+### 6. Sync Approved Asset Transfer to Oracle
+
+**POST** `/asset-transfers/{transfer_id}/sync`
+
+Trigger a background job to push an approved asset transfer to Oracle. Requires the transfer `status` to be `approved`.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Sync started",
+  "task_id": "celery-task-id"
+}
+```
+
+On worker side, the ERP Integration Service calls the Oracle package `XDXG_FAT_ONLINE_PKG.fat_transfer_loc` per item using the mapped `erp_asset_id` and destination `erp_location_id` and OU/CC.
+
 
 **GET** `/erp/locations-mapping`
 
@@ -210,6 +227,13 @@ The system performs incremental syncs by default:
 5. **Log Results**: Record sync operation in `sync_logs` table
 
 ### 2. Full Sync
+### 3. Approved Transfer Push (App → Oracle)
+
+1. Workflow marks transfer as `approved`.
+2. Background task iterates items and validates destination locations mapping.
+3. Calls `fat_transfer_loc` with arguments: `(erp_asset_id, erp_location_id, destination_ou, destination_cc, out_result, out_status)`.
+4. On success for all items: commit, set transfer `status=completed`.
+5. On error: rollback as needed, log error to `sync_logs` with `sync_type=oracle_transfer_sync`.
 
 To perform a full sync, set `force_full_sync=true`:
 

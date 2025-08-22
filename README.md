@@ -14,6 +14,7 @@ The Asset Management System is a modern, scalable solution designed to manage ph
 - **ERP Integration**: Real-time synchronization with Oracle ERP database
 - **User Management**: Role-based access control with OAuth2 authentication
 - **Asset Transfers**: Inter-location transfers with approval workflows
+- **ERP Transfer Sync**: Automatic push of approved transfers to Oracle ERP
 - **Background Processing**: Asynchronous task processing for large operations
 - **Reporting**: Comprehensive audit logs and system reports
 
@@ -223,6 +224,11 @@ VITE_FRONTEND_PORT=3000
 - `GET /erp/sync-history` - Sync history
 - `GET /erp/sync-config` - Sync configuration
 - `GET /erp/locations-mapping` - Location mapping
+
+### Asset Transfers
+- `GET /asset-transfers` - List transfers
+- `POST /asset-transfers` - Create transfer
+- `POST /asset-transfers/{transfer_id}/sync` - Manually sync an approved transfer to Oracle ERP (admin-only; retries background job)
 
 ### Background Tasks
 - `GET /task-status/{task_id}` - Get task status

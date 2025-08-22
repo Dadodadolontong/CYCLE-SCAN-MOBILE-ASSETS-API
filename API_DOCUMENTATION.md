@@ -277,6 +277,16 @@ Authorization: Bearer <token>
 }
 ```
 
+#### Manually Sync an Approved Transfer to Oracle
+```bash
+POST /asset-transfers/{transfer_id}/sync
+Authorization: Bearer <token>
+```
+
+**Notes:**
+- Transfer must be in `approved` status.
+- Queues a background job to push to Oracle; check task status via task APIs.
+
 ## ERP Integration APIs
 
 ### Test Connection
