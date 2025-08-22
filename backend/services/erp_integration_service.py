@@ -2,7 +2,7 @@ import logging
 from typing import List, Dict, Any, Optional, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from models import Asset, Location, SyncLog, ERPSyncConfig, Branch
+from models import Asset, Location, SyncLog, ERPSyncConfig, Branch, AssetTransfer,AssetTransferItem
 from schemas import ERPAssetPayload, ERPAssetResponse
 import uuid
 from datetime import datetime
@@ -24,10 +24,10 @@ class ERPIntegrationService:
         os = platform.system()
         if os == "Windows":
             d = f"{config.ORACLE_CLIENT_PATH}"
-            logger.info(f"Initializing Oracle client with lib_dir: {d}")            
+            
             oracledb.init_oracle_client(lib_dir=d)
         elif os == "Linux":
-            logger.info("Initializing Oracle client")
+            
             oracledb.init_oracle_client()
 
         try:
@@ -41,12 +41,12 @@ class ERPIntegrationService:
                 dsn=dsn
             )
             
-            logger.info(f"Successfully connected to Oracle database: {config.ORACLE_HOST}")
+            
             return connection
             
         except Exception as e:
             error_msg = f"Failed to connect to Oracle database: {str(e)}"
-            logger.error(error_msg)
+            
             raise Exception(error_msg)
         
     def sync_locations_from_oracle(self):
@@ -123,7 +123,7 @@ class ERPIntegrationService:
                         existing_location.branch_id = branch_id.id
                     existing_location.updated_at = datetime.utcnow()
                     existing_location.synced_at = datetime.utcnow()
-                    logger.info(f"Updated location with ERP ID: {row[2]}")
+            
                 else:
                     # Create new location
                     new_location = Location(
@@ -134,10 +134,10 @@ class ERPIntegrationService:
                         branch_id=branch_id.id if branch_id else None
                     )
                     self.db.add(new_location)
-                    logger.info(f"Created new location with ERP ID: {row[2]}")
+            
 
         except Exception as e:
-            logger.error(f"Error updating location: {str(e)}")
+            
             self.db.rollback()
             cursor.close()
             connection.close()
@@ -150,7 +150,6 @@ class ERPIntegrationService:
         self.db.commit()
         cursor.close()
         connection.close()
-        logger.info(f"Successfully synced {len(rows)} locations from Oracle ERP")
         return ERPAssetResponse(
             success=True,
             message=f"Successfully synced {len(rows)} locations from Oracle ERP",
@@ -184,7 +183,6 @@ class ERPIntegrationService:
                 return default_date
                 
         except Exception as e:
-            logger.error(f"Error getting last sync date: {str(e)}")
             # Return a default date if there's an error
             return datetime(2020, 1, 1)
 
@@ -209,10 +207,8 @@ class ERPIntegrationService:
                 self.db.add(sync_config)
             
             self.db.commit()
-            logger.info(f"Updated last sync date to: {sync_date}")
             
         except Exception as e:
-            logger.error(f"Error updating last sync date: {str(e)}")
             self.db.rollback()
 
     def fetch_assets_from_oracle(self, last_sync_date: datetime) -> Tuple[bool, List[Dict[str, Any]], str]:
@@ -223,7 +219,6 @@ class ERPIntegrationService:
         try:
             connection = self.get_oracle_connection()
             cursor = connection.cursor()
-            logger.info(f"Fetching assets from Oracle ERP since: {last_sync_date}")
             
             # Query assets from Oracle ERP
             query = """
@@ -260,7 +255,6 @@ class ERPIntegrationService:
                 ORDER BY fa.asset_id
             """
             
-            logger.info(f"Querying Oracle ERP for assets updated after: {last_sync_date}")
             
             cursor.execute(query, last_sync_date=last_sync_date)
             
@@ -281,12 +275,10 @@ class ERPIntegrationService:
                 }
                 assets.append(asset)                 
             
-            logger.info(f"Successfully fetched {len(assets)} assets from Oracle ERP")
             return True, assets, ""
             
         except Exception as e:
             error_msg = f"Error fetching assets from Oracle ERP: {str(e)}"
-            logger.error(error_msg)
             return False, [], error_msg
             
         finally:
@@ -309,7 +301,6 @@ class ERPIntegrationService:
 
             # Validate required fields
             if not barcode or not name or not location_id:
-                logger.warning(f"Missing required fields in Oracle data: {oracle_data}")
                 return None
 
             return ERPAssetPayload(
@@ -323,7 +314,6 @@ class ERPIntegrationService:
             )
             
         except Exception as e:
-            logger.error(f"Error mapping Oracle data: {str(e)}, data: {oracle_data}")
             return None
 
     def find_location_by_erp_id(self, erp_location_id: str) -> Optional[Location]:
@@ -341,7 +331,6 @@ class ERPIntegrationService:
             location = self.find_location_by_erp_id(erp_asset.location_id)
             if not location:
                 error_msg = f"Location not found for ERP location ID: {erp_asset.location_id}"
-                logger.warning(error_msg)
                 return False, error_msg, None
 
             # Check if asset already exists by barcode (tag_number)
@@ -359,7 +348,6 @@ class ERPIntegrationService:
                 existing_asset.synced_at = datetime.utcnow()
                 
                 self.db.commit()
-                logger.info(f"Updated asset with barcode: {erp_asset.barcode}")
                 return True, "Asset updated", existing_asset
             else:
                 # Create new asset
@@ -381,18 +369,15 @@ class ERPIntegrationService:
                 self.db.commit()
                 self.db.refresh(new_asset)
                 
-                logger.info(f"Created new asset with barcode: {erp_asset.barcode}")
                 return True, "Asset created", new_asset
                 
         except IntegrityError as e:
             self.db.rollback()
             error_msg = f"Database integrity error: {str(e)}"
-            logger.error(error_msg)
             return False, error_msg, None
         except Exception as e:
             self.db.rollback()
             error_msg = f"Error creating/updating asset: {str(e)}"
-            logger.error(error_msg)
             return False, error_msg, None
 
     def sync_assets_from_oracle(
@@ -416,10 +401,8 @@ class ERPIntegrationService:
             # Get last sync date
             if force_full_sync:
                 last_sync_date = datetime(2020, 1, 1)  # Force full sync
-                logger.info("Performing full sync from Oracle ERP")
             else:
                 last_sync_date = self.get_last_sync_date('asset_sync')
-                logger.info(f"Performing incremental sync from Oracle ERP since: {last_sync_date}")
 
             # Fetch assets from Oracle
             success, oracle_data, error_msg = self.fetch_assets_from_oracle(last_sync_date)
@@ -464,7 +447,6 @@ class ERPIntegrationService:
                 except Exception as e:
                     error_msg = f"Error processing Oracle record: {str(e)}"
                     errors.append(error_msg)
-                    logger.error(error_msg)
 
             # Update last sync date
             self.update_last_sync_date(current_sync_date, 'asset_sync')
@@ -501,7 +483,6 @@ class ERPIntegrationService:
             self.db.commit()
             
             error_msg = f"Unexpected error during Oracle ERP sync: {str(e)}"
-            logger.error(error_msg)
             return ERPAssetResponse(
                 success=False,
                 message=error_msg,
@@ -597,3 +578,52 @@ class ERPIntegrationService:
         Get sync log by task ID
         """
         return self.db.query(SyncLog).filter(SyncLog.id == task_id).first() 
+    
+    def update_asset_location(self, asset_transfer_id: str):
+        """
+        Update asset location
+        """        
+        logger.info(f"Updating asset location for asset transfer: {asset_transfer_id}")
+        asset_transfer = self.db.query(AssetTransfer).filter(AssetTransfer.id == asset_transfer_id and AssetTransfer.status == "approved").first()
+        if asset_transfer:
+            try:
+                connection = self.get_oracle_connection()
+                cursor = connection.cursor()
+            except Exception as e:
+                return False, f"Failed to connect to Oracle ERP database: {str(e)}"
+    
+            transfer_items = self.db.query(AssetTransferItem).filter(AssetTransferItem.transfer_id == asset_transfer_id).all()
+            for item in transfer_items:
+                asset = self.db.query(Asset).filter(Asset.id == item.asset_id).first()
+                location = self.db.query(Location).filter(Location.id == item.destination_location_id).first()
+                if asset and location:
+                    try:
+                        result = cursor.var(str)
+                        status = cursor.var(str)
+                        
+                        cursor.callproc('XDXG_FAT_ONLINE_PKG.fat_transfer_loc', [asset.erp_asset_id, location.erp_location_id, item.destination_ou, item.destination_cc, result, status]
+                                        )
+                        if status.getvalue() == 'E':
+                            return False, f"Failed to process asset location: {result.getvalue()}"                        
+                        
+                    except Exception as e:
+                        return False, f"Failed to call API: {str(e)}"
+                else:
+                    return False, f"Asset or location not found"
+            try:
+                connection.commit()
+                cursor.close()
+                connection.close()
+                asset_transfer.status = "completed"
+                self.db.commit()
+                return True, f"Asset location updated successfully"
+            except Exception as e:
+                return False, f"Failed to commit asset location: {str(e)}"
+        else:
+            return False, f"Asset transfer not found"
+        
+        
+
+
+
+    

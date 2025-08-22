@@ -14,6 +14,7 @@ from models import (
     Asset,
     Branch,
     AssetTransferItem,
+    AssetLocationUpdate,
 )
 from config import config
 from services.mailer import send_email
@@ -118,7 +119,6 @@ class WorkflowService:
                 actor_id = token_actor or actor_id
             except Exception:
                 raise HTTPException(status_code=400, detail='Invalid step token')
-        logger.info(f"Deciding on {instance.scenario_name}-{instance.current_step} with business ref {instance.business_ref} for step {step_index} with actor {actor_id} and action {action}")
 
         # Enforce turn-taking and assignment
         if (instance.current_step or 0) != int(step_index):
@@ -138,26 +138,27 @@ class WorkflowService:
         if action == 'approve' and item_details and step_row.actor_type in ('finance_manager') and step_def.get('scope') == 'receiving':
             at = self.db.query(AssetTransfer).filter(AssetTransfer.transfer_number == instance.business_ref).first()
             if at:
-                # Build dict of incoming updates: id -> dest loc
-                updates = {str(d.get('id')): d.get('destination_location_id') for d in item_details if d.get('id') and d.get('destination_location_id')}
-                if updates:
-                    # Validate locations belong to destination branch
-                    locs = {l.id: l for l in self.db.query(Location).filter(Location.id.in_(list(updates.values()))).all()}
-                    for loc_id in updates.values():
-                        loc = locs.get(loc_id)
-                        if not loc:
-                            raise HTTPException(status_code=422, detail='Invalid destination location')
-                        if at.destination_branch_id and loc.branch_id != at.destination_branch_id:
-                            raise HTTPException(status_code=422, detail='Destination location must be in destination branch')
-                    # Persist per-item
-                    items = self.db.query(AssetTransferItem).filter(AssetTransferItem.transfer_id == at.id).all()
-                    for itm in items:
-                        dest = updates.get(str(itm.id))
-                        if dest:
-                            setattr(itm, 'destination_location_id', dest)
-                            self.db.add(itm)
+                for d in item_details:
+                    logger.info(f"Destination: {d}")
+                    item = self.db.query(AssetTransferItem).filter(AssetTransferItem.id == d.get('id')).first()
+                    if item:
+                        setattr(item, 'destination_location_id', d.get('destination_location_id'))
+                        setattr(item, 'destination_ou', d.get('destination_ou'))
+                        setattr(item, 'destination_cc', d.get('destination_cc'))
+                        self.db.add(item)
 
-                
+                        current_asset = self.db.query(Asset).filter(Asset.id == item.asset_id).first()
+
+                        asset_location_update = AssetLocationUpdate(
+                            id=str(uuid.uuid4()),
+                            asset_id=item.asset_id,
+                            old_location_id=getattr(current_asset, 'location_id', None),
+                            new_location_id=d.get('destination_location_id')
+                        )
+                        self.db.add(asset_location_update)
+
+                        setattr(current_asset, 'location_id', d.get('destination_location_id'))
+                        self.db.add(current_asset)            
 
         # Record decision on the planned step row
         step_row.status = 'approved' if action == 'approve' else 'rejected'
@@ -181,6 +182,11 @@ class WorkflowService:
             next_step = (instance.current_step or 0) + 1
             if next_step >= total_steps:
                 instance.status = 'approved'
+                try:
+                    from tasks.erp_tasks import sync_asset_transfer_to_oracle_task
+                    sync_asset_transfer_to_oracle_task.delay(instance.business_ref)
+                except Exception as e:
+                    logger.error(f"Error syncing asset transfer to Oracle: {e}")
             else:
                 instance.current_step = next_step
                 self._enter_step(instance, next_step)
@@ -289,19 +295,21 @@ class WorkflowService:
                 'items': detailed_items,
             }
         # Planned step history and expected actors
-        scenario = self.db.query(WorkflowScenario).filter(WorkflowScenario.name == inst.scenario_name).first()
-        steps_def: List[Dict[str, Any]] = (scenario.rules or {}).get('steps', []) if scenario else []
+       
         history = self.db.query(WorkflowStep).filter(WorkflowStep.instance_id == inst.id).order_by(WorkflowStep.step_index.asc()).all()
         history_out: List[Dict[str, Any]] = []
         for h in history:
-            user = self.db.query(User).filter(User.id == h.decided_by).first() if h.decided_by else None
+            actor_id= h.decided_by if h.decided_by else h.assigned_actor_ids[0] if h.assigned_actor_ids else None
+            logger.info(f"Actor ID: {actor_id}")
+            logger.info(f"Assigned Actor IDs: {h.assigned_actor_ids}")
+            user = self.db.query(User).filter(User.id == actor_id).first()
             history_out.append({
                 'step_index': h.step_index,
                 'actor_type': h.actor_type,
                 'status': h.status,
                 'scope': h.scope,
-                'decided_by': h.decided_by,
-                'decided_by_name': getattr(user, 'email', None),
+                'decided_by': getattr(user, 'email', None),
+                'decided_by_name': getattr(user, 'display_name', None),
                 'decided_at': h.decided_at,
             })
         # Expected remains same as planned with assigned actors
@@ -367,7 +375,8 @@ class WorkflowService:
                 if user and user.email:
                     send_email(user.email, f"Approval required: {instance.business_ref}", html)
             except Exception as e:
-                logger.error(f"Failed to send approval email for {instance.business_ref} to actor {uid}: {e}")
+                error_msg = f"Failed to send approval email for {instance.business_ref} to actor {uid}: {e}"
+                raise Exception(error_msg)
 
     def _build_email_html(self, business_ref: str, requester: Any, src_branch: Any, dst_branch: Any, items: List[Any], link: str) -> str:
         header_rows = f"""

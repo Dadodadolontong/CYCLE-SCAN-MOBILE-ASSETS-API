@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from db import get_db
 from auth import get_current_user, require_role
-from models import User, SyncLog
+from models import User, SyncLog, Location
 from services.erp_integration_service import ERPIntegrationService
 from schemas import ERPAssetResponse
 from datetime import datetime
@@ -215,3 +215,16 @@ async def get_locations_mapping(
         ],
         "total": len(locations)
     } 
+
+@router.post("/update-asset-location")
+async def update_asset_location(
+    asset_transfer_id: str = Body(..., embed=True),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update asset location
+    """
+    erp_service = ERPIntegrationService(db)
+    result = erp_service.update_asset_location(asset_transfer_id)
+    return result

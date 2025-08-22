@@ -123,8 +123,10 @@ const ApprovalReview = () => {
                 <thead>
                   <tr className="text-left border-b">
                     <th className="py-2 pr-3">Barcode</th>
-                    <th className="py-2">Name</th>
-                    <th className="py-2 pl-3">Location</th>
+                    <th className="py-2" style={{ minWidth: '100px' }}>Name</th>
+                    <th className="py-2" style={{ minWidth: '80px' }}>Location</th>
+                    <th className="py-2 pl-3" style={{ width: '50px' }}>OU</th>
+                    <th className="py-2 pl-3" style={{ width: '50px' }}>CC</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -144,6 +146,16 @@ const ApprovalReview = () => {
                             <option key={l.id} value={l.id}>{l.name}</option>
                           ))}
                         </select>
+                      </td>
+                      <td className="py-2 pl-3" style={{ width: '90px' }}>
+                        <input type="text" maxLength={5} className="w-full border rounded p-2 text-center" value={it.destination_ou || ''} onChange={(e) => setInstDetails((prev: any) => ({ ...prev, transfer: { ...prev.transfer, items: prev.transfer.items.map((i: any) => i.id === it.id ? { ...i, destination_ou: e.target.value } : i) } }))}
+                          disabled={!isReceivingFinance}
+                        />
+                      </td>
+                      <td className="py-2 pl-3" style={{ width: '90px' }}>
+                        <input type="text" maxLength={5} className="w-full border rounded p-2 text-center" value={it.destination_cc || ''} onChange={(e) => setInstDetails((prev: any) => ({ ...prev, transfer: { ...prev.transfer, items: prev.transfer.items.map((i: any) => i.id === it.id ? { ...i, destination_cc: e.target.value } : i) } }))}
+                          disabled={!isReceivingFinance}
+                        />
                       </td>
                     </tr>
                   ))}

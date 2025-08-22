@@ -375,31 +375,23 @@ class LocationService:
 
     def list_locations(self, user_id: Optional[str] = None, branch_id: Optional[str] = None, search: Optional[str] = None, skip: int = 0, limit: int = 50) -> Dict[str, Any]:
         q = self.db.query(Location)
-        logger.info(f"Query: {q}")
         if branch_id:
             q = q.filter(Location.branch_id == branch_id)
 
-        logger.info(f"Branch ID: {branch_id}")
-        logger.info(f"User ID: {user_id}")
-        logger.info(f"Search: {search}")
         
         if search:
             q = q.filter(Location.name.ilike(f'%{search}%'))
         if user_id:
             scope = get_access_scope_for_user(self.db, user_id)
-            logger.info(f"Scope: {scope}")
             if not scope['is_admin']:
                 allowed_ids = set(scope['location_ids'])
-                logger.info(f"Allowed IDs: {allowed_ids}")
                 q = q.filter(Location.id.in_(allowed_ids))
         
         # Get total count
         total = q.count()
 
-        logger.info(f"Total locations: {total}")
         # Apply pagination
         locations = q.order_by(Location.name).offset(skip).limit(limit).all()
-        logger.info(f"Locations: {locations}")
         result = [
             {
                 'id': l.id,

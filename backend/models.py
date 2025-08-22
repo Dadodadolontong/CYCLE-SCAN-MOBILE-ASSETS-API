@@ -103,6 +103,15 @@ class Asset(Base):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
     synced_at = Column(DateTime, server_default=func.now())
 
+class AssetLocationUpdate(Base):
+    __tablename__ = 'asset_location_updates'
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), server_default=text('uuid()'))
+    asset_id = Column(String(36), ForeignKey('assets.id'), nullable=False)
+    old_location_id = Column(String(36), ForeignKey('locations.id'), nullable=False)
+    new_location_id = Column(String(36), ForeignKey('locations.id'), nullable=False)    
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
 class Category(Base):
     __tablename__ = 'categories'
     id = Column(String(36), primary_key=True)
@@ -280,7 +289,7 @@ class WorkflowStep(Base):
     instance_id = Column(String(36), ForeignKey('workflow_instances.id', ondelete='CASCADE'), nullable=False)
     step_index = Column(Integer, nullable=False)
     actor_type = Column(String(64), nullable=False)
-    scope = Column(String(64), nullable=False)
+    scope = Column(String(64), nullable=True)
     assigned_actor_ids = Column(JSON)  # [user_ids]
     status = Column(String(32), default='pending')
     decided_by = Column(String(36))
@@ -340,6 +349,8 @@ class AssetTransferItem(Base):
     asset_id = Column(String(36), ForeignKey('assets.id'), nullable=False)
     barcode = Column(String(64), nullable=False)
     destination_location_id = Column(String(36), ForeignKey('locations.id'), nullable=True)
+    destination_ou = Column(String(3), nullable=True)
+    destination_cc = Column(String(3), nullable=True)
     transfer = relationship('AssetTransfer', back_populates='items')
 
 class AssetTransferApproval(Base):

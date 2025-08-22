@@ -20,7 +20,6 @@ def sync_assets_from_oracle_task(self, user_id: str = None, force_full_sync: boo
     Background task to sync assets from Oracle ERP
     """
     task_id = str(uuid.uuid4())
-    logger.info(f"Starting ERP asset sync task {task_id} for user {user_id}")
     
     # Update task state
     current_task.update_state(
@@ -58,10 +57,8 @@ def sync_assets_from_oracle_task(self, user_id: str = None, force_full_sync: boo
         # Get last sync date
         if force_full_sync:
             last_sync_date = datetime(2000, 1, 1)
-            logger.info("Performing full sync from Oracle ERP")
         else:
             last_sync_date = erp_service.get_last_sync_date('asset_sync')
-            logger.info(f"Performing incremental sync since: {last_sync_date}")
         
         # Update task state
         current_task.update_state(
@@ -154,7 +151,6 @@ def sync_assets_from_oracle_task(self, user_id: str = None, force_full_sync: boo
             except Exception as e:
                 error_msg = f"Error processing Oracle record: {str(e)}"
                 errors.append(error_msg)
-                logger.error(error_msg)
         
         # Update last sync date
         erp_service.update_last_sync_date(current_sync_date, 'asset_sync')
@@ -202,7 +198,6 @@ def sync_assets_from_oracle_task(self, user_id: str = None, force_full_sync: boo
         
     except Exception as e:
         error_msg = f"ERP sync task failed: {str(e)}"
-        logger.error(error_msg)
         
         # Update sync log with error if it exists
         try:
@@ -241,7 +236,6 @@ def sync_locations_from_oracle_task(self, user_id: str = None):
     Background task to sync locations from Oracle ERP
     """
     task_id = str(uuid.uuid4())
-    logger.info(f"Starting ERP location sync task {task_id} for user {user_id}")
     
     # Update task state
     current_task.update_state(
@@ -310,7 +304,6 @@ def sync_locations_from_oracle_task(self, user_id: str = None):
         
     except Exception as e:
         error_msg = f"ERP location sync task failed: {str(e)}"
-        logger.error(error_msg)
         
         # Update sync log with error if it exists
         try:
@@ -340,3 +333,43 @@ def sync_locations_from_oracle_task(self, user_id: str = None):
             db.close()
         except:
             pass 
+
+
+task_kwargs = {"time_limit": 10 if current_platform == "windows" else {}, "bind": True, "name": "tasks.erp_tasks.sync_asset_transfer_to_oracle"}
+
+@celery_app.task(**task_kwargs)
+def sync_asset_transfer_to_oracle_task(self, transfer_id: str, user_id: str = None):
+    task_id = str(uuid.uuid4())
+    current_task.update_state(state="PROGRESS", meta={"task_id": task_id, "status": "starting", "message": "Syncing approved asset transfer to Oracle..."})
+    db = None
+    try:
+        db = next(get_db())
+        svc = ERPIntegrationService(db)
+        sync_log = svc.create_sync_log(sync_type="oracle_transfer_sync", initiated_by=user_id, task_id=task_id)
+
+        current_task.update_state(state="PROGRESS", meta={"task_id": task_id, "sync_log_id": sync_log.id, "status": "calling_oracle"})
+        ok, msg = svc.update_asset_location(transfer_id)
+
+        if ok:
+            svc.update_sync_log_success(sync_log.id, assets_synced=0, errors_count=0, error_details={"message": msg})
+            current_task.update_state(state="SUCCESS", meta={"task_id": task_id, "sync_log_id": sync_log.id, "status": "completed", "message": msg})
+            return {"success": True, "message": msg, "task_id": task_id, "sync_log_id": sync_log.id}
+        else:
+            svc.update_sync_log_error(sync_log.id, msg)
+            current_task.update_state(state="FAILURE", meta={"task_id": task_id, "sync_log_id": sync_log.id, "status": "failed", "error": msg})
+            return {"success": False, "message": msg, "task_id": task_id, "sync_log_id": sync_log.id}
+    except Exception as e:
+        err = f"Transfer ERP sync task failed: {e}"
+        try:
+            if db:
+                svc.update_sync_log_error(sync_log.id, err)  # best effort
+        except:
+            pass
+        current_task.update_state(state="FAILURE", meta={"task_id": task_id, "status": "failed", "error": err})
+        return {"success": False, "message": err, "task_id": task_id}
+    finally:
+        try:
+            if db:
+                db.close()
+        except:
+            pass
